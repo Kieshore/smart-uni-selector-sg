@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model University {
+  university_id   Int      @id @default(autoincrement())
+  university_name String   @unique
+  short_name      String?  @unique
+  country         String?
+  website_url     String?
+  created_at      DateTime @default(now())
+
+  courses Course[]
+
+  @@map("universities")
+}
+
+model Course {
+  course_id      Int      @id @default(autoincrement())
+  university_id  Int
+  course_name    String
+  degree_type    String?
+  faculty        String?
+  course_code    String?
+  course_fees    Int?
+  duration_years Decimal? @db.Decimal(4, 1)
+  intake_size    Int?
+  broad_field    String?
+  created_at     DateTime @default(now())
+
+  university University                @relation(fields: [university_id], references: [university_id], onDelete: Cascade)
+  admissions CourseAdmissionsProfile[]
+  outcomes   CourseOutcome[]
+
+  @@unique([university_id, course_name])
+  @@map("courses")
+}
+
+model CourseAdmissionsProfile {
+  admission_profile_id Int      @id @default(autoincrement())
+  course_id            Int
+  min_gpa              Decimal? @db.Decimal(3, 2)
+  upper_percentile_gpa Decimal? @db.Decimal(3, 2)
+  min_rank_points      Decimal? @db.Decimal(5, 2)
+  upper_rank_points    Decimal? @db.Decimal(5, 2)
+  required_subjects    Json?
+  notes                String?
+  intake_size          Int?
+  demand_score         Decimal? @db.Decimal(5, 2)
+  competitiveness_band String?
+  year_recorded        Int
+  source_type          String?
+  last_updated         DateTime @updatedAt
+
+  course Course @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+
+  @@unique([course_id, year_recorded])
+  @@map("course_admissions_profiles")
+}
+
+model CourseOutcome {
+  outcome_id             Int      @id @default(autoincrement())
+  course_id              Int
+  median_salary          Decimal? @db.Decimal(10, 2)
+  employment_rate        Decimal? @db.Decimal(5, 2)
+  further_study_rate     Decimal? @db.Decimal(5, 2)
+  career_prospects_score Decimal? @db.Decimal(5, 2)
+  source_year            Int
+  source_type            String?
+  created_at             DateTime @default(now())
+
+  course Course @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+
+  @@unique([course_id, source_year])
+  @@map("course_outcomes")
+}
