@@ -4,8 +4,7 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -29,13 +28,9 @@ model Course {
   course_id      Int      @id @default(autoincrement())
   university_id  Int
   course_name    String
-  degree_type    String?
-  faculty        String?
-  course_code    String?
-  course_fees    Int?
+  school        String?
   duration_years Decimal? @db.Decimal(4, 1)
-  intake_size    Int?
-  broad_field    String?
+  career_prospects    String?
   created_at     DateTime @default(now())
 
   university University                @relation(fields: [university_id], references: [university_id], onDelete: Cascade)
@@ -71,9 +66,9 @@ model CourseAdmissionsProfile {
 model CourseOutcome {
   outcome_id             Int      @id @default(autoincrement())
   course_id              Int
-  median_salary          Decimal? @db.Decimal(10, 2)
-  employment_rate        Decimal? @db.Decimal(5, 2)
-  further_study_rate     Decimal? @db.Decimal(5, 2)
+  basic_monthly_median          Decimal? @db.Decimal(10, 2)
+  employment_rate_overall        Decimal? @db.Decimal(5, 2)
+  employment_rate_ft_perm        Decimal? @db.Decimal(5, 2)
   career_prospects_score Decimal? @db.Decimal(5, 2)
   source_year            Int
   source_type            String?
