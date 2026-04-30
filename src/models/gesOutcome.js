@@ -40,6 +40,28 @@ function normalizeGenericCourseName(name) {
 
   let s = cleanText(name);
 
+  // preserve generic NUS broad degrees before wrappers get stripped into blanks
+  if (
+    s === "bachelor of arts" ||
+    s === "bachelor of arts hons" ||
+    s === "bachelor of arts with honours" ||
+    s === "bachelor of arts with honors"
+  ) return "arts";
+
+  if (
+    s === "bachelor of science" ||
+    s === "bachelor of science hons" ||
+    s === "bachelor of science with honours" ||
+    s === "bachelor of science with honors"
+  ) return "science";
+
+  if (
+    s === "bachelor of business administration" ||
+    s === "bachelor of business administration hons" ||
+    s === "bachelor of business administration with honours" ||
+    s === "bachelor of business administration with honors"
+  ) return "business administration";
+
   // strip full degree wrappers first
   s = s.replace(/\bbachelor of engineering with honours in\b/g, "");
   s = s.replace(/\bbachelor of engineering with honors in\b/g, "");
@@ -52,7 +74,12 @@ function normalizeGenericCourseName(name) {
   s = s.replace(/\bbachelor of arts in\b/g, "");
   s = s.replace(/\bbachelor of fine arts in\b/g, "");
   s = s.replace(/\bbachelor of professional studies in\b/g, "");
+  s = s.replace(/\bbachelor of business administration in\b/g, "");
   s = s.replace(/\bbachelor of business administration\b/g, "");
+  s = s.replace(/\bbachelor of hospitality business with honours\b/g, "hospitality business");
+  s = s.replace(/\bbachelor of hospitality business\b/g, "hospitality business");
+  s = s.replace(/\bbachelor of law\b/g, "law");
+  s = s.replace(/\bbachelor of laws\b/g, "law");
   s = s.replace(/\bbachelor of computing\b/g, "");
   s = s.replace(/\bbachelor of engineering\b/g, "");
   s = s.replace(/\bbachelor of science\b/g, "");
@@ -61,7 +88,6 @@ function normalizeGenericCourseName(name) {
   s = s.replace(/\bbachelor of\b/g, "");
   s = s.replace(/\bbachelor\b/g, "");
 
-  // honours / programme noise
   s = s.replace(/\bwith honours\b/g, "");
   s = s.replace(/\bwith honors\b/g, "");
   s = s.replace(/\bhonours\b/g, "");
@@ -70,6 +96,8 @@ function normalizeGenericCourseName(name) {
 
   s = s.replace(/\b\d+\s*yr\b/g, "");
   s = s.replace(/\b\d+\s*year\b/g, "");
+  s = s.replace(/\b4 years\b/g, "");
+  s = s.replace(/\b4 year\b/g, "");
   s = s.replace(/\bdirect honours programme\b/g, "");
   s = s.replace(/\bdirect honors programme\b/g, "");
   s = s.replace(/\bdirect programme\b/g, "");
@@ -78,17 +106,17 @@ function normalizeGenericCourseName(name) {
   s = s.replace(/\bprogram\b/g, "");
   s = s.replace(/\bdirect\b/g, "");
 
-  // result / classification noise
   s = s.replace(/\bcum laude and above\b/g, "");
   s = s.replace(/\bcum laude\b/g, "");
 
-  // extra business wrappers
   s = s.replace(/\bdouble degree in\b/g, "");
+  s = s.replace(/\binter disciplinary\b/g, "interdisciplinary");
   s = s.replace(/\bmajor in\b/g, "");
   s = s.replace(/\bmajoring in\b/g, "");
 
   s = s.replace(/[()]/g, " ");
   s = s.replace(/[^a-z0-9\s]/g, " ");
+  s = s.replace(/^\s*in\s+/g, "");
   s = s.replace(/\s+/g, " ").trim();
 
   return s;
@@ -109,7 +137,6 @@ function extractPreferredBracketContent(rawName, universityShortName) {
     "l l b",
   ]);
 
-  // For NUS, prefer meaningful bracket content
   if (universityShortName === "NUS") {
     for (const item of matches) {
       const cleaned = cleanText(item);
@@ -132,21 +159,25 @@ function normalizeCourseNameForMatching(universityShortName, rawName) {
   return normalizeGenericCourseName(rawName);
 }
 
-// Officially confirmed / strong rename mappings first
 function applyKnownCourseRenames(universityShortName, normalizedName) {
   const knownRenames = {
-    // NUS official: Business Artificial Intelligence Systems was formerly Information Systems
+    // NUS
     "NUS::information systems": "business artificial intelligence systems",
-
-    // Strong current-name mappings from legacy NUS labels to your current table
+    "NUS::computer science": "computer science",
     "NUS::medicine and surgery": "medicine",
     "NUS::medicine and surgery mbbs": "medicine",
     "NUS::dental surgery": "dentistry",
+    "NUS::law": "law",
+    "NUS::laws": "law",
     "NUS::llb": "law",
     "NUS::l l b": "law",
-    "NUS::laws": "law",
-
-    // Current broad course mapping in your table
+    "NUS::business administration": "business administration",
+    "NUS::accountancy": "business administration",
+    "NUS::arts": "humanities and sciences",
+    "NUS::science": "humanities and sciences",
+    "NUS::social sciences": "humanities and sciences",
+    "NUS::applied science": "humanities and sciences",
+    "NUS::data science and analytics": "data science and economics",
     "NUS::chemical engineering": "engineering",
     "NUS::civil engineering": "engineering",
     "NUS::electrical engineering": "engineering",
@@ -157,44 +188,59 @@ function applyKnownCourseRenames(universityShortName, normalizedName) {
     "NUS::mechanical engineering": "engineering",
     "NUS::bioengineering": "engineering",
     "NUS::biomedical engineering": "engineering",
-
     "NUS::project and facilities management": "engineering",
     "NUS::real estate": "engineering",
+    "NUS::communications and media": "computer science",
+    "NUS::electronic commerce": "computer science",
+    "NUS::computational biology": "computer science",
 
-    // old broad faculty degree labels -> current CHS umbrella in your table
-    "NUS::arts": "humanities and sciences",
-    "NUS::social sciences": "humanities and sciences",
-    "NUS::applied science": "humanities and sciences",
-    "NUS::science": "humanities and sciences",
-
-    // NUS BBA(Accountancy) -> your current course table only has Business Administration
-    "NUS::accountancy": "business administration",
-
-    // legacy NUS computing specialisations that do not exist as-is in your current course master
-    "NUS::communications and media": "common computer science programmes",
-    "NUS::electronic commerce": "common computer science programmes",
-    "NUS::computational biology": "common computer science programmes",
-
-    // NTU wording changes / singular-plural fixes
+    // NTU
     "NTU::mathematical science": "mathematical sciences",
+    "NTU::mathematics and mathematical sciences": "mathematical sciences",
     "NTU::sports science and management": "sport science and management",
-    "NTU::physics applied physics": "physics",
-    "NTU::arts": "arts",
-    "NTU::science": "science",
+    "NTU::physics and applied physics": "physics applied physics",
+    "NTU::physics applied physics": "physics applied physics",
+    "NTU::environmental earth systems sciences": "environmental earth systems science",
+    "NTU::arts with education": "arts academic discipline and education",
+    "NTU::science with education": "science academic discipline and education",
+    "NTU::biomedical science": "biological sciences",
+    "NTU::biomedical sciences": "biological sciences",
+    "NTU::biological and biomedical sciences": "biological sciences",
+    "NTU::biomedical sciences and chinese medicine": "chinese medicine",
+    "NTU::biomedical science traditional chinese medicine": "chinese medicine",
+    "NTU::art design and media": "art design and media design art",
+    "NTU::fine arts": "art design and media design art",
+    "NTU::education": "arts academic discipline and education",
 
-    // SMU business-rule mappings
+    // SMU
     "SMU::information systems management": "information systems",
-    "SMU::laws": "law",
-    "SMU::law": "law",
+    "SMU::accountancy 4 years": "accountancy",
+    "SMU::business management 4 years": "business management",
+    "SMU::economics 4 years": "economics",
+    "SMU::social sciences 4 years": "social sciences",
+    "SMU::law 4 years": "law",
+    "SMU::information systems management 4 years": "information systems",
 
-    // SUTD legacy -> current
-    "SUTD::information systems technology and design": "computer science and design",
+    // SIT
+    "SIT::bachelor of early childhood education": "bachelor of early childhood education",
+    "SIT::early childhood education": "bachelor of early childhood education",
+    "SIT::hospitality business": "hospitality and tourism management",
+    "SIT::criminology and security": "bachelor of public safety and security",
+    "SIT::sustainable infrastructure engineering land": "infrastructure and systems engineering",
+    "SIT::sustainable infrastructure engineering building services": "infrastructure and systems engineering",
+    "SIT::telematics intelligent transportation systems engineering": "engineering systems",
+    "SIT::systems engineering electromechanical systems": "engineering systems",
+    "SIT::in food business management": "food business management culinary arts",
+    "SIT::air transport management": "aviation management",
+    "SIT::aerospace engineering": "aircraft systems engineering",
+
+    // SUSS
+    "SUSS::law": "bachelor of law",
   };
 
   return knownRenames[`${universityShortName}::${normalizedName}`] || normalizedName;
 }
 
-// Additional alias / cleanup layer after rename handling
 function applyAlias(universityShortName, normalizedName) {
   const aliases = {
     // NTU
@@ -204,12 +250,13 @@ function applyAlias(universityShortName, normalizedName) {
     "NTU::business 3 yr": "business",
     "NTU::business 3 yr direct": "business",
     "NTU::business 3 yr direct programme": "business",
-    "NTU::art design and media": "art design and media design art",
 
-    // SIT wrapper-heavy legacy names
+    // SIT
     "SIT::game design": "user experience and game design",
     "SIT::digital arts and animation": "digital art and animation",
+    "SIT::digital art and animation": "digital art and animation",
     "SIT::computer science and game design": "computer science in interactive media and game development",
+    "SIT::computer science in real time interactive simulation": "computer science in real-time interactive simulation",
     "SIT::real time interactive simulation": "computer science in real-time interactive simulation",
     "SIT::communication design": "communication and digital media",
     "SIT::interior design": "communication and digital media",
@@ -232,7 +279,6 @@ function applyAlias(universityShortName, normalizedName) {
     "SIT::computing science": "computing science",
     "SIT::nursing practice": "nursing",
     "SIT::hospitality management": "hospitality and tourism management",
-    "SIT::early childhood education": "bachelor of early childhood education",
 
     // SUTD
     "SUTD::engineering product development": "engineering product development",
@@ -255,7 +301,8 @@ function isLikelyDoubleDegree(rawName, normalizedName) {
     s.includes("business and computer engineering") ||
     s.includes("aerospace engineering and economics") ||
     s.includes("materials engineering and economics") ||
-    s.includes("mechanical engineering and economics")
+    s.includes("mechanical engineering and economics") ||
+    s.includes("mathematics and economics")
   );
 }
 
@@ -275,11 +322,14 @@ module.exports.syncGESOutcomes = async function syncGESOutcomes() {
     const normalizedCourseName = normalizeGenericCourseName(course.course_name);
     const key = `${shortName}::${normalizedCourseName}`;
 
-    courseMap.set(key, {
-      course_id: course.course_id,
-      course_name: course.course_name,
-      university_short_name: shortName,
-    });
+    // avoid accidental overlap overwrite by keeping the first inserted mapping
+    if (!courseMap.has(key)) {
+      courseMap.set(key, {
+        course_id: course.course_id,
+        course_name: course.course_name,
+        university_short_name: shortName,
+      });
+    }
   }
 
   const unmatched = [];

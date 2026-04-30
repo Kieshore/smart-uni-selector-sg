@@ -25,13 +25,13 @@ model University {
 }
 
 model Course {
-  course_id      Int      @id @default(autoincrement())
-  university_id  Int
-  course_name    String
-  school        String?
-  duration_years Decimal? @db.Decimal(4, 1)
-  career_prospects    String?
-  created_at     DateTime @default(now())
+  course_id        Int      @id @default(autoincrement())
+  university_id    Int
+  course_name      String
+  school           String?
+  duration_years   Decimal? @db.Decimal(4, 1)
+  career_prospects String?
+  created_at       DateTime @default(now())
 
   university University                @relation(fields: [university_id], references: [university_id], onDelete: Cascade)
   admissions CourseAdmissionsProfile[]
@@ -42,37 +42,59 @@ model Course {
 }
 
 model CourseAdmissionsProfile {
-  admission_profile_id Int      @id @default(autoincrement())
-  course_id            Int
-  min_gpa              Decimal? @db.Decimal(3, 2)
-  upper_percentile_gpa Decimal? @db.Decimal(3, 2)
-  min_rank_points      Decimal? @db.Decimal(5, 2)
-  upper_rank_points    Decimal? @db.Decimal(5, 2)
-  required_subjects    Json?
-  notes                String?
-  intake_size          Int?
-  demand_score         Decimal? @db.Decimal(5, 2)
-  competitiveness_band String?
-  year_recorded        Int
-  source_type          String?
-  last_updated         DateTime @updatedAt
+  admission_profile_id    Int      @id @default(autoincrement())
+  course_id               Int
+  min_gpa                 Decimal? @db.Decimal(3, 2)
+  tenth_percentile_grades String?
+  tenth_percentile_rp     Decimal? @db.Decimal(5, 2)
+  required_subjects       Json?
+  notes                   String?
+  intake_size             Int?
+  demand_score            Decimal? @db.Decimal(5, 2)
+  competitiveness_band    String?
+  year_recorded           Int
+  source_type             String?
+  last_updated            DateTime @updatedAt
 
-  course Course @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+  course       Course                       @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+  band_metrics CourseAdmissionsBandMetric[]
 
   @@unique([course_id, year_recorded])
   @@map("course_admissions_profiles")
 }
 
+model CourseAdmissionsBandMetric {
+  band_metric_id       Int      @id @default(autoincrement())
+  admission_profile_id Int
+  university_code      String
+  qualification_type   String
+  metric_type          String
+  scope_type           String?
+  band_label           String
+  band_min             Decimal? @db.Decimal(5, 2)
+  band_max             Decimal? @db.Decimal(5, 2)
+  percentage_value     Decimal? @db.Decimal(5, 2)
+  display_order        Int?
+  source_note          String?
+  created_at           DateTime @default(now())
+
+  admission_profile CourseAdmissionsProfile @relation(fields: [admission_profile_id], references: [admission_profile_id], onDelete: Cascade)
+
+  @@index([admission_profile_id])
+  @@index([university_code, qualification_type, metric_type])
+  @@map("course_admissions_band_metrics")
+}
+
 model CourseOutcome {
-  outcome_id             Int      @id @default(autoincrement())
-  course_id              Int
-  basic_monthly_median          Decimal? @db.Decimal(10, 2)
-  employment_rate_overall        Decimal? @db.Decimal(5, 2)
-  employment_rate_ft_perm        Decimal? @db.Decimal(5, 2)
-  career_prospects_score Decimal? @db.Decimal(5, 2)
-  source_year            Int
-  source_type            String?
-  created_at             DateTime @default(now())
+  outcome_id              Int      @id @default(autoincrement())
+  course_id               Int
+  basic_monthly_median    Decimal? @db.Decimal(10, 2)
+  employment_rate_overall Decimal? @db.Decimal(5, 2)
+  employment_rate_ft_perm Decimal? @db.Decimal(5, 2)
+  career_prospects_score  Decimal? @db.Decimal(5, 2)
+  source_year             Int
+  source_type             String?
+  created_at              DateTime @default(now())
 
   course Course @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
 
