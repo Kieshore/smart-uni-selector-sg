@@ -11,6 +11,58 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  user_id     Int      @id @default(autoincrement())
+  first_name  String
+  full_name   String   @unique
+  citizenship String?
+  email       String   @unique
+  created_at  DateTime @default(now())
+
+  academic_profiles UserAcademicProfile[]
+  preferences       UserPreference[]
+
+  @@map("users")
+}
+
+model UserAcademicProfile {
+  academic_profile_id Int      @id @default(autoincrement())
+  user_id             Int
+  qualification_type  String
+  current_gpa         Decimal? @db.Decimal(3, 2)
+  projected_gpa       Decimal? @db.Decimal(3, 2)
+  rank_points         Decimal? @db.Decimal(5, 2)
+  diploma_name        String?
+  institution_name    String?
+  graduation_year     Int?
+  english_grade       String?
+  math_grade          String?
+  computing_grade     String?
+  created_at          DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("user_academic_profiles")
+}
+
+model UserPreference {
+  preference_id               Int      @id @default(autoincrement())
+  user_id                     Int
+  preferred_fields            Json?
+  preferred_universities      Json?
+  prioritise_salary           Int?
+  prioritise_interest_fit     Int?
+  prioritise_flexibility      Int?
+  prioritise_admission_chance Int?
+  prioritise_prestige         Int?
+  wants_broad_degree          Boolean?
+  created_at                  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
 model University {
   university_id   Int      @id @default(autoincrement())
   university_name String   @unique
