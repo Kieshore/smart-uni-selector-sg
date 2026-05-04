@@ -80,6 +80,7 @@ def fetch_all_rows():
                 "school": row.get("school"),
                 "raw_course_name": degree,
                 "basic_monthly_median": to_float(row.get("basic_monthly_median")),
+                "gross_monthly_median": to_float(row.get("gross_monthly_median")),
                 "employment_rate_overall": to_float(row.get("employment_rate_overall")),
                 "employment_rate_ft_perm": to_float(row.get("employment_rate_ft_perm")),
                 "career_prospects_score": None,

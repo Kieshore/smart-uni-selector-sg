@@ -157,6 +157,7 @@ function buildCourseResult({
       ? {
           source_year: latestOutcome.source_year,
           basic_monthly_median: latestOutcome.basic_monthly_median,
+          gross_monthly_median: latestOutcome.gross_monthly_median,
           employment_rate_ft_perm: latestOutcome.employment_rate_ft_perm,
           employment_rate_overall: latestOutcome.employment_rate_overall,
         }
@@ -269,7 +270,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
               take: 1,
               select: {
                 source_year: true,
-                basic_monthly_median: true,
+                gross_monthly_median: true,
                 employment_rate_ft_perm: true,
                 employment_rate_overall: true,
               },
@@ -338,6 +339,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
                   select: {
                     source_year: true,
                     basic_monthly_median: true,
+                    gross_monthly_median: true,
                     employment_rate_ft_perm: true,
                     employment_rate_overall: true,
                   },

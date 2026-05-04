@@ -363,6 +363,7 @@ module.exports.syncGESOutcomes = async function syncGESOutcomes() {
       },
       update: {
         basic_monthly_median: row.basic_monthly_median,
+        gross_monthly_median: row.gross_monthly_median,
         employment_rate_overall: row.employment_rate_overall,
         employment_rate_ft_perm: row.employment_rate_ft_perm,
         career_prospects_score: row.career_prospects_score,
@@ -371,6 +372,7 @@ module.exports.syncGESOutcomes = async function syncGESOutcomes() {
       create: {
         course_id: matchedCourse.course_id,
         basic_monthly_median: row.basic_monthly_median,
+        gross_monthly_median: row.gross_monthly_median,
         employment_rate_overall: row.employment_rate_overall,
         employment_rate_ft_perm: row.employment_rate_ft_perm,
         career_prospects_score: row.career_prospects_score,
