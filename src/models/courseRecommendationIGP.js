@@ -1,30 +1,11 @@
 const prisma = require("../lib/prisma");
+const { getUserAlevelScores } = require("../utils/aLevelScoreUtils");
 
 const DEFAULT_DIFFERENCE = 0;
 
 const QUALIFICATION = {
   POLY: ["polytechnic", "poly"],
   JC: ["a-level", "a level", "jc", "junior college"],
-};
-
-const H2_POINTS = {
-  A: 20,
-  B: 17.5,
-  C: 15,
-  D: 12.5,
-  E: 10,
-  S: 5,
-  U: 0,
-};
-
-const H1_POINTS = {
-  A: 10,
-  B: 8.75,
-  C: 7.5,
-  D: 6.25,
-  E: 5,
-  S: 2.5,
-  U: 0,
 };
 
 function normalizeQualificationType(value) {
@@ -39,56 +20,8 @@ function isJcQualification(value) {
   return QUALIFICATION.JC.includes(normalizeQualificationType(value));
 }
 
-function parseTenthPercentileGrades(gradeProfile) {
-  if (!gradeProfile || typeof gradeProfile !== "string") {
-    return null;
-  }
-
-  const cleaned = gradeProfile.replace(/\s+/g, "").toUpperCase();
-  const parts = cleaned.split("/");
-
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const h2Part = parts[0];
-  const h1Part = parts[1];
-
-  if (h2Part.length !== 3 || h1Part.length !== 1) {
-    return null;
-  }
-
-  const validGrades = ["A", "B", "C", "D", "E", "S", "U"];
-  const h2Grades = h2Part.split("");
-  const h1Grade = h1Part;
-
-  const allValid =
-    h2Grades.every((g) => validGrades.includes(g)) &&
-    validGrades.includes(h1Grade);
-
-  if (!allValid) {
-    return null;
-  }
-
-  return { h2Grades, h1Grade };
-}
-
-function calculateLegacyRpFromGradeProfile(gradeProfile) {
-  const parsed = parseTenthPercentileGrades(gradeProfile);
-
-  if (!parsed) {
-    return null;
-  }
-
-  const { h2Grades, h1Grade } = parsed;
-
-  const h2Total = h2Grades.reduce((sum, grade) => sum + H2_POINTS[grade], 0);
-  const h1Total = H1_POINTS[h1Grade];
-
-  const gpPoints = H1_POINTS.C;
-  const pwPoints = H1_POINTS.C;
-
-  return Number((h2Total + h1Total + gpPoints + pwPoints).toFixed(2));
+function toNumber(value) {
+  return value === null || value === undefined ? null : Number(value);
 }
 
 function getAcademicValue(profile) {
@@ -103,13 +36,20 @@ function getAcademicValue(profile) {
   }
 
   if (isJcQualification(profile.qualification_type)) {
-    if (profile.rank_points !== null && profile.rank_points !== undefined) {
-      return Number(profile.rank_points);
-    }
-    return null;
+    const scores = getUserAlevelScores(profile);
+    return scores.uas70;
   }
 
   return null;
+}
+
+function getLegacyComparableValue(profile) {
+  if (!isJcQualification(profile.qualification_type)) {
+    return null;
+  }
+
+  const scores = getUserAlevelScores(profile);
+  return scores.legacy90;
 }
 
 function isValueWithinBand(value, bandMin, bandMax) {
@@ -138,8 +78,10 @@ function getDirectCutoffValue(admissionsProfile, qualificationType) {
   }
 
   if (isJcQualification(qualificationType)) {
-    return admissionsProfile.tenth_percentile_rp !== null && admissionsProfile.tenth_percentile_rp !== undefined
-      ? Number(admissionsProfile.tenth_percentile_rp)
+    // IMPORTANT: direct AU matching uses 70-scale
+    return admissionsProfile.tenth_percentile_uas_70 !== null &&
+      admissionsProfile.tenth_percentile_uas_70 !== undefined
+      ? Number(admissionsProfile.tenth_percentile_uas_70)
       : null;
   }
 
@@ -151,7 +93,6 @@ function getCutoffGap({ benchmarkValue, qualificationType, admissionsProfile, ma
     return null;
   }
 
-  // For band-based matches, use lower bound of band where possible
   if (matchedBandMetric) {
     if (matchedBandMetric.band_min !== null && matchedBandMetric.band_min !== undefined) {
       return Number((benchmarkValue - Number(matchedBandMetric.band_min)).toFixed(2));
@@ -186,11 +127,13 @@ function buildCourseResult({
   return {
     course_id: admissionsProfile.course.course_id,
     course_name: admissionsProfile.course.course_name,
+    university_code: admissionsProfile.course.university?.short_name ?? null,
     admission_profile_id: admissionsProfile.admission_profile_id,
     year_recorded: admissionsProfile.year_recorded,
     min_gpa: admissionsProfile.min_gpa,
     tenth_percentile_grades: admissionsProfile.tenth_percentile_grades,
     tenth_percentile_rp: admissionsProfile.tenth_percentile_rp,
+    tenth_percentile_uas_70: admissionsProfile.tenth_percentile_uas_70,
     intake_size: admissionsProfile.intake_size,
     matched_via: matchedVia,
     benchmark_value: benchmarkValue,
@@ -221,58 +164,12 @@ function buildCourseResult({
   };
 }
 
-module.exports.updateTenthPercentileRp = async function updateTenthPercentileRp(courseId = null) {
-  const whereClause = {
-    tenth_percentile_grades: {
-      not: null,
-    },
-    ...(courseId ? { course_id: parseInt(courseId, 10) } : {}),
-  };
-
-  const profiles = await prisma.courseAdmissionsProfile.findMany({
-    where: whereClause,
-    select: {
-      admission_profile_id: true,
-      course_id: true,
-      tenth_percentile_grades: true,
-    },
-  });
-
-  let updated = 0;
-  const skipped = [];
-
-  for (const profile of profiles) {
-    const computedRp = calculateLegacyRpFromGradeProfile(profile.tenth_percentile_grades);
-
-    if (computedRp === null) {
-      skipped.push({
-        admission_profile_id: profile.admission_profile_id,
-        course_id: profile.course_id,
-        tenth_percentile_grades: profile.tenth_percentile_grades,
-      });
-      continue;
-    }
-
-    await prisma.courseAdmissionsProfile.update({
-      where: {
-        admission_profile_id: profile.admission_profile_id,
-      },
-      data: {
-        tenth_percentile_rp: computedRp,
-      },
-    });
-
-    updated++;
-  }
-
-  return {
-    totalProfilesChecked: profiles.length,
-    updated,
-    skipped,
-  };
-};
-
-module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForUser(userId, difference = DEFAULT_DIFFERENCE, limit = null, uniCode = null) {
+module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForUser(
+  userId,
+  difference = DEFAULT_DIFFERENCE,
+  limit = null,
+  uniCode = null
+) {
   const parsedUserId = parseInt(userId, 10);
   const parsedDifference = Number(difference ?? DEFAULT_DIFFERENCE);
   const parsedLimit =
@@ -312,8 +209,9 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
 
   for (const profile of relevantProfiles) {
     const benchmarkValue = getAcademicValue(profile);
+    const legacyComparableValue = getLegacyComparableValue(profile);
 
-    if (benchmarkValue === null) {
+    if (benchmarkValue === null && legacyComparableValue === null) {
       results.push({
         academic_profile_id: profile.academic_profile_id,
         qualification_type: profile.qualification_type,
@@ -325,9 +223,8 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       continue;
     }
 
-    const maxAllowedCutoff = benchmarkValue + parsedDifference;
-
-    const admissionsWhereClause = {
+    // DIRECT IGP matching
+    const directWhereClause = {
       ...(normalizedUniCode
         ? {
             course: {
@@ -341,19 +238,20 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
         ? {
             min_gpa: {
               not: null,
-              lte: maxAllowedCutoff,
+              lte: benchmarkValue + parsedDifference,
             },
           }
         : {
-            tenth_percentile_rp: {
+            // DIRECT AU rows must use 70-scale
+            tenth_percentile_uas_70: {
               not: null,
-              lte: maxAllowedCutoff,
+              lte: benchmarkValue + parsedDifference,
             },
           }),
     };
 
     const directMatches = await prisma.courseAdmissionsProfile.findMany({
-      where: admissionsWhereClause,
+      where: directWhereClause,
       include: {
         course: {
           select: {
@@ -379,11 +277,27 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
           },
         },
       },
+      orderBy: {
+        year_recorded: "desc",
+      },
     });
 
+    // Keep latest year only per course
+    const latestDirectMap = new Map();
+    for (const row of directMatches) {
+      if (!latestDirectMap.has(row.course.course_id)) {
+        latestDirectMap.set(row.course.course_id, row);
+      }
+    }
+
+    // BAND matching
     const bandQualificationType = isPolyQualification(profile.qualification_type)
       ? "poly_gpa"
       : "a_level_uas";
+
+    const bandCompareValue = isPolyQualification(profile.qualification_type)
+      ? benchmarkValue
+      : legacyComparableValue;
 
     const bandCandidates = await prisma.courseAdmissionsBandMetric.findMany({
       where: {
@@ -434,18 +348,28 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
         },
       },
       orderBy: [
+        { admission_profile: { year_recorded: "desc" } },
         { percentage_value: "desc" },
         { display_order: "asc" },
       ],
     });
 
     const filteredBandMatches = bandCandidates.filter((row) =>
-      isValueWithinBand(benchmarkValue, row.band_min, row.band_max)
+      isValueWithinBand(bandCompareValue, row.band_min, row.band_max)
     );
+
+    // Latest year only per course for band rows
+    const latestBandMap = new Map();
+    for (const row of filteredBandMatches) {
+      const courseId = row.admission_profile.course.course_id;
+      if (!latestBandMap.has(courseId)) {
+        latestBandMap.set(courseId, row);
+      }
+    }
 
     const deduped = new Map();
 
-    for (const admissionsProfile of directMatches) {
+    for (const admissionsProfile of latestDirectMap.values()) {
       const latestOutcome = admissionsProfile.course.outcomes[0] || null;
 
       deduped.set(
@@ -461,10 +385,9 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       );
     }
 
-    for (const bandMetric of filteredBandMatches) {
+    for (const bandMetric of latestBandMap.values()) {
       const admissionsProfile = bandMetric.admission_profile;
       const latestOutcome = admissionsProfile.course.outcomes[0] || null;
-
       const existing = deduped.get(admissionsProfile.course.course_id);
 
       const result = buildCourseResult({
@@ -472,7 +395,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
         latestOutcome,
         matchedVia: "band_metric",
         matchedBandMetric: bandMetric,
-        benchmarkValue,
+        benchmarkValue: bandCompareValue,
         qualificationType: profile.qualification_type,
       });
 
@@ -496,7 +419,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       const bGap = b.cutoff_gap === null ? Number.POSITIVE_INFINITY : Number(b.cutoff_gap);
 
       if (aGap !== bGap) {
-        return aGap - bGap; // ascending cutoff gap
+        return aGap - bGap;
       }
 
       const bBand = b.band_metric?.percentage_value ? Number(b.band_metric.percentage_value) : -1;
@@ -520,6 +443,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       academic_profile_id: profile.academic_profile_id,
       qualification_type: profile.qualification_type,
       benchmark_value: benchmarkValue,
+      legacy_band_compare_value: legacyComparableValue,
       difference_used: parsedDifference,
       uni_code: normalizedUniCode,
       courses: rankedCourses,
