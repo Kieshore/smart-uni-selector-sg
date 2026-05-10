@@ -18,10 +18,16 @@ const BASE_PRESTIGE_SCORES = {
  * Internal weights inside the INTEREST priority system.
  * This is separate from the outer priority weighting.
  */
-const INTEREST_ZONE_WEIGHTS = {
+const POSITIVE_INTEREST_ZONE_WEIGHTS = {
   high: 1.0,
   medium: 0.5,
   low: 0.2,
+};
+
+const NEGATIVE_INTEREST_ZONE_WEIGHTS = {
+  high_unwanted: 1.0,
+  medium_unwanted: 0.5,
+  low_unwanted: 0.2,
 };
 
 const INTEREST_RELEVANCE_MAX = 3;
@@ -80,6 +86,32 @@ function toNumber(value) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function parseBoolean(value, defaultValue = false) {
+  if (value === null || value === undefined || value === "") {
+    return defaultValue;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+
+  if (["true", "1", "yes", "y", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "0", "no", "n", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 function normalizePreferredUniversities(value) {
   if (!value) {
     return [];
@@ -125,7 +157,6 @@ function parseInterestList(rawValue) {
       return [];
     }
 
-    // Support JSON array strings too
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       try {
         const parsed = JSON.parse(trimmed);
@@ -157,30 +188,83 @@ function buildInterestProfileFromQuery(query) {
   const medium = parseInterestList(query.medium_interests).map(normalizeInterestName);
   const low = parseInterestList(query.low_interests).map(normalizeInterestName);
 
+  const highUnwanted = parseInterestList(query.high_unwanted_interests).map(normalizeInterestName);
+  const mediumUnwanted = parseInterestList(query.medium_unwanted_interests).map(normalizeInterestName);
+  const lowUnwanted = parseInterestList(query.low_unwanted_interests).map(normalizeInterestName);
+
   return {
     high: [...new Set(high)],
     medium: [...new Set(medium)],
     low: [...new Set(low)],
+    high_unwanted: [...new Set(highUnwanted)],
+    medium_unwanted: [...new Set(mediumUnwanted)],
+    low_unwanted: [...new Set(lowUnwanted)],
   };
 }
 
 function getAllSelectedInterests(interestProfile) {
-  return [...interestProfile.high, ...interestProfile.medium, ...interestProfile.low];
+  return [
+    ...interestProfile.high,
+    ...interestProfile.medium,
+    ...interestProfile.low,
+    ...interestProfile.high_unwanted,
+    ...interestProfile.medium_unwanted,
+    ...interestProfile.low_unwanted,
+  ];
 }
 
-function validateInterestProfile(interestProfile, priorityOrder) {
+function getAllWantedInterests(interestProfile) {
+  return [
+    ...interestProfile.high,
+    ...interestProfile.medium,
+    ...interestProfile.low,
+  ];
+}
+
+function getAllUnwantedInterests(interestProfile) {
+  return [
+    ...interestProfile.high_unwanted,
+    ...interestProfile.medium_unwanted,
+    ...interestProfile.low_unwanted,
+  ];
+}
+
+function validateInterestProfile(interestProfile, priorityOrder, options = {}) {
   const selectedInterests = getAllSelectedInterests(interestProfile);
+  const wantedInterests = getAllWantedInterests(interestProfile);
   const includesInterestPriority = priorityOrder.includes("interest");
+  const excludeUnwantedInterests = Boolean(options.excludeUnwantedInterests);
+  const onlyWantedInterests = Boolean(options.onlyWantedInterests);
 
   if (includesInterestPriority && selectedInterests.length === 0) {
     throw new Error(
-      "interest_priority was provided but no interests were supplied. Pass high_interests, medium_interests, or low_interests."
+      "interest_priority was provided but no interests were supplied. Pass high_interests, medium_interests, low_interests, or the unwanted interest fields."
+    );
+  }
+
+  if (onlyWantedInterests && wantedInterests.length === 0) {
+    throw new Error(
+      "only_wanted_interests=true requires at least one wanted interest in high_interests, medium_interests, or low_interests."
+    );
+  }
+
+  if (excludeUnwantedInterests && onlyWantedInterests) {
+    throw new Error(
+      "exclude_unwanted_interests and only_wanted_interests cannot both be true at the same time."
     );
   }
 
   const zoneByInterest = new Map();
+  const allZones = [
+    "high",
+    "medium",
+    "low",
+    "high_unwanted",
+    "medium_unwanted",
+    "low_unwanted",
+  ];
 
-  for (const zone of ["high", "medium", "low"]) {
+  for (const zone of allZones) {
     for (const interestName of interestProfile[zone]) {
       const existingZone = zoneByInterest.get(interestName);
 
@@ -406,6 +490,12 @@ function attachPriorityDebug(course, priorityOrder, priorityWeights, metricStats
     if (metricKey === "interest" && course.interest_fit) {
       metrics[metricKey].zones = course.interest_fit.zones;
       metrics[metricKey].matched_interest_count = course.interest_fit.matched_interest_count;
+      metrics[metricKey].wanted_score = course.interest_fit.wanted_score;
+      metrics[metricKey].unwanted_penalty = course.interest_fit.unwanted_penalty;
+      metrics[metricKey].excluded_due_to_unwanted = course.interest_fit.excluded_due_to_unwanted;
+      metrics[metricKey].excluded_unwanted_matches = course.interest_fit.excluded_unwanted_matches;
+      metrics[metricKey].excluded_due_to_only_wanted = course.interest_fit.excluded_due_to_only_wanted;
+      metrics[metricKey].wanted_matches = course.interest_fit.wanted_matches;
     }
   }
 
@@ -432,11 +522,20 @@ function calculateSingleInterestMatchScore(relevanceScore) {
   return Number(((numericRelevance / INTEREST_RELEVANCE_MAX) * 100).toFixed(4));
 }
 
-async function attachInterestScoresToCourses(courses, interestProfile) {
+async function attachInterestScoresToCourses(
+  courses,
+  interestProfile,
+  options = {}
+) {
+  const excludeUnwantedInterests = Boolean(options.excludeUnwantedInterests);
+  const onlyWantedInterests = Boolean(options.onlyWantedInterests);
   const selectedInterests = getAllSelectedInterests(interestProfile);
 
   if (!Array.isArray(courses) || courses.length === 0 || selectedInterests.length === 0) {
-    return courses;
+    return {
+      courses,
+      excluded_courses: [],
+    };
   }
 
   const courseIds = courses
@@ -444,10 +543,12 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
     .filter((value) => value !== null);
 
   if (courseIds.length === 0) {
-    return courses;
+    return {
+      courses,
+      excluded_courses: [],
+    };
   }
 
-  // Adjust model names here only if your Prisma client uses different names
   const interestGroups = await prisma.interestGroup.findMany({
     where: {
       interest_name: {
@@ -467,18 +568,30 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
   const selectedInterestGroupIds = interestGroups.map((group) => group.interest_group_id);
 
   if (selectedInterestGroupIds.length === 0) {
-    return courses.map((course) => ({
-      ...course,
-      interest_fit: {
-        score: 0,
-        matched_interest_count: 0,
-        zones: {
-          high: [],
-          medium: [],
-          low: [],
+    return {
+      courses: courses.map((course) => ({
+        ...course,
+        interest_fit: {
+          score: 0,
+          wanted_score: 0,
+          unwanted_penalty: 0,
+          matched_interest_count: 0,
+          excluded_due_to_unwanted: false,
+          excluded_unwanted_matches: [],
+          excluded_due_to_only_wanted: false,
+          wanted_matches: [],
+          zones: {
+            high: [],
+            medium: [],
+            low: [],
+            high_unwanted: [],
+            medium_unwanted: [],
+            low_unwanted: [],
+          },
         },
-      },
-    }));
+      })),
+      excluded_courses: [],
+    };
   }
 
   const courseInterestRows = await prisma.courseRelatedInterest.findMany({
@@ -504,19 +617,30 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
     courseInterestMap.set(key, toNumber(row.relevance_score) ?? 0);
   }
 
-  return courses.map((course) => {
-    let weightedScoreSum = 0;
-    let totalPossibleWeight = 0;
+  const enrichedCourses = [];
+  const excludedCourses = [];
+
+  for (const course of courses) {
+    let wantedWeightedScoreSum = 0;
+    let wantedTotalPossibleWeight = 0;
+    let unwantedWeightedPenaltySum = 0;
+    let unwantedTotalPossibleWeight = 0;
     let matchedInterestCount = 0;
 
     const zoneDebug = {
       high: [],
       medium: [],
       low: [],
+      high_unwanted: [],
+      medium_unwanted: [],
+      low_unwanted: [],
     };
 
+    const excludedUnwantedMatches = [];
+    const wantedMatches = [];
+
     for (const zone of ["high", "medium", "low"]) {
-      const zoneWeight = INTEREST_ZONE_WEIGHTS[zone];
+      const zoneWeight = POSITIVE_INTEREST_ZONE_WEIGHTS[zone];
       const zoneInterests = interestProfile[zone];
 
       for (const interestName of zoneInterests) {
@@ -527,11 +651,18 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
 
         const matchScore = calculateSingleInterestMatchScore(relevanceScore);
 
-        totalPossibleWeight += zoneWeight;
-        weightedScoreSum += matchScore * zoneWeight;
+        wantedTotalPossibleWeight += zoneWeight;
+        wantedWeightedScoreSum += matchScore * zoneWeight;
 
         if (relevanceScore > 0) {
           matchedInterestCount += 1;
+          wantedMatches.push({
+            interest_name: interestName,
+            relevance_score: relevanceScore,
+            match_score: matchScore,
+            zone_weight: zoneWeight,
+            zone,
+          });
         }
 
         zoneDebug[zone].push({
@@ -543,18 +674,86 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
       }
     }
 
-    const finalInterestScore =
-      totalPossibleWeight > 0 ? Number((weightedScoreSum / totalPossibleWeight).toFixed(4)) : 0;
+    for (const zone of ["high_unwanted", "medium_unwanted", "low_unwanted"]) {
+      const zoneWeight = NEGATIVE_INTEREST_ZONE_WEIGHTS[zone];
+      const zoneInterests = interestProfile[zone];
 
-    return {
+      for (const interestName of zoneInterests) {
+        const interestGroupId = interestGroupMap.get(interestName);
+        const relevanceScore = interestGroupId
+          ? courseInterestMap.get(`${course.course_id}:${interestGroupId}`) ?? 0
+          : 0;
+
+        const matchScore = calculateSingleInterestMatchScore(relevanceScore);
+
+        unwantedTotalPossibleWeight += zoneWeight;
+        unwantedWeightedPenaltySum += matchScore * zoneWeight;
+
+        if (relevanceScore > 0) {
+          excludedUnwantedMatches.push({
+            interest_name: interestName,
+            relevance_score: relevanceScore,
+            match_score: matchScore,
+            zone_weight: zoneWeight,
+            zone,
+          });
+        }
+
+        zoneDebug[zone].push({
+          interest_name: interestName,
+          relevance_score: relevanceScore,
+          match_score: matchScore,
+          zone_weight: zoneWeight,
+        });
+      }
+    }
+
+    const wantedScore =
+      wantedTotalPossibleWeight > 0
+        ? Number((wantedWeightedScoreSum / wantedTotalPossibleWeight).toFixed(4))
+        : 0;
+
+    const unwantedPenalty =
+      unwantedTotalPossibleWeight > 0
+        ? Number((unwantedWeightedPenaltySum / unwantedTotalPossibleWeight).toFixed(4))
+        : 0;
+
+    const finalInterestScore = Number(
+      clamp(wantedScore - unwantedPenalty, 0, 100).toFixed(4)
+    );
+
+    const excludedDueToUnwanted =
+      excludeUnwantedInterests && excludedUnwantedMatches.length > 0;
+
+    const excludedDueToOnlyWanted =
+      onlyWantedInterests && wantedMatches.length === 0;
+
+    const enrichedCourse = {
       ...course,
       interest_fit: {
         score: finalInterestScore,
+        wanted_score: wantedScore,
+        unwanted_penalty: unwantedPenalty,
         matched_interest_count: matchedInterestCount,
+        excluded_due_to_unwanted: excludedDueToUnwanted,
+        excluded_unwanted_matches: excludedUnwantedMatches,
+        excluded_due_to_only_wanted: excludedDueToOnlyWanted,
+        wanted_matches: wantedMatches,
         zones: zoneDebug,
       },
     };
-  });
+
+    if (excludedDueToUnwanted || excludedDueToOnlyWanted) {
+      excludedCourses.push(enrichedCourse);
+    } else {
+      enrichedCourses.push(enrichedCourse);
+    }
+  }
+
+  return {
+    courses: enrichedCourses,
+    excluded_courses: excludedCourses,
+  };
 }
 
 function sortCoursesByWeightedPriority(courses, priorityOrder) {
@@ -623,6 +822,7 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
     rank_number: index + 1,
   }));
 }
+
 module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibleCoursesForUser(
   queryParams
 ) {
@@ -631,14 +831,22 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
     difference = 0,
     limit = null,
     uni_code = null,
-    band_min_percentage = 80
+    band_min_percentage = 80,
+    exclude_unwanted_interests = false,
+    only_wanted_interests = false,
   } = queryParams;
 
   const priorityOrder = buildPriorityOrderFromQuery(queryParams);
   validatePriorityOrder(priorityOrder);
 
+  const excludeUnwantedInterests = parseBoolean(exclude_unwanted_interests, false);
+  const onlyWantedInterests = parseBoolean(only_wanted_interests, false);
+
   const interestProfile = buildInterestProfileFromQuery(queryParams);
-  validateInterestProfile(interestProfile, priorityOrder);
+  validateInterestProfile(interestProfile, priorityOrder, {
+    excludeUnwantedInterests,
+    onlyWantedInterests,
+  });
 
   const savedPreferredUniversities = await getSavedPreferredUniversities(userId);
   validatePrestigeUsage(priorityOrder, uni_code, savedPreferredUniversities);
@@ -658,22 +866,53 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
       ? profileResult.courses
       : [];
 
-    const enrichedCourses = priorityOrder.includes("interest")
-      ? await attachInterestScoresToCourses(originalCourses, interestProfile)
-      : originalCourses;
+    let enrichedCourses = originalCourses;
+    let excludedCourses = [];
+
+    if (priorityOrder.includes("interest")) {
+      const interestProcessingResult = await attachInterestScoresToCourses(
+        originalCourses,
+        interestProfile,
+        {
+          excludeUnwantedInterests,
+          onlyWantedInterests,
+        }
+      );
+
+      enrichedCourses = interestProcessingResult.courses;
+      excludedCourses = interestProcessingResult.excluded_courses;
+    }
 
     const rankedCourses =
       priorityOrder.length > 0
         ? sortCoursesByWeightedPriority(enrichedCourses, priorityOrder)
-        : enrichedCourses;
+        : enrichedCourses.map((course, index) => ({
+            ...course,
+            rank_number: index + 1,
+          }));
 
     rankedResults.push({
       ...profileResult,
       applied_priority_order: priorityOrder,
       applied_priority_weights: buildPriorityWeights(priorityOrder),
       applied_interest_profile: interestProfile,
+      exclude_unwanted_interests: excludeUnwantedInterests,
+      only_wanted_interests: onlyWantedInterests,
       saved_preferred_universities: savedPreferredUniversities,
       total_eligible_courses: originalCourses.length,
+      total_courses_after_interest_filter: rankedCourses.length,
+      total_excluded_due_to_unwanted: excludeUnwantedInterests
+        ? excludedCourses.filter((course) => course?.interest_fit?.excluded_due_to_unwanted).length
+        : 0,
+      total_excluded_due_to_only_wanted: onlyWantedInterests
+        ? excludedCourses.filter((course) => course?.interest_fit?.excluded_due_to_only_wanted).length
+        : 0,
+      excluded_courses_due_to_unwanted: excludeUnwantedInterests
+        ? excludedCourses.filter((course) => course?.interest_fit?.excluded_due_to_unwanted)
+        : [],
+      excluded_courses_due_to_only_wanted: onlyWantedInterests
+        ? excludedCourses.filter((course) => course?.interest_fit?.excluded_due_to_only_wanted)
+        : [],
       courses: rankedCourses,
     });
   }
@@ -681,8 +920,12 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
   return {
     ...eligibleData,
     available_priority_metrics: Object.keys(PRIORITY_METRICS),
-    available_interest_zones: Object.keys(INTEREST_ZONE_WEIGHTS),
-    interest_zone_weights: INTEREST_ZONE_WEIGHTS,
+    available_interest_zones: [
+      ...Object.keys(POSITIVE_INTEREST_ZONE_WEIGHTS),
+      ...Object.keys(NEGATIVE_INTEREST_ZONE_WEIGHTS),
+    ],
+    positive_interest_zone_weights: POSITIVE_INTEREST_ZONE_WEIGHTS,
+    negative_interest_zone_weights: NEGATIVE_INTEREST_ZONE_WEIGHTS,
     prestige_score_map: BASE_PRESTIGE_SCORES,
     results: rankedResults,
   };
