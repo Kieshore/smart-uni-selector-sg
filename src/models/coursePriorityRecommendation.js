@@ -367,17 +367,40 @@ function calculateWeightedPriorityScore(course, priorityOrder, priorityWeights, 
 
 function attachPriorityDebug(course, priorityOrder, priorityWeights, metricStats) {
   const metrics = {};
+  let totalScore = 0;
+  let totalPossibleScore = 0;
 
   for (const metricKey of priorityOrder) {
     const metricConfig = PRIORITY_METRICS[metricKey];
     const rawValue = metricConfig.getValue(course);
     const normalizedScore = getNormalizedMetricScore(course, metricKey, metricStats);
+    const weight = Number((priorityWeights[metricKey] ?? 0).toFixed(4));
+    const stats = metricStats[metricKey];
+
+    const contribution =
+      normalizedScore === null || normalizedScore === undefined
+        ? 0
+        : Number((normalizedScore * weight).toFixed(4));
+
+    const contributionMax = Number((100 * weight).toFixed(4));
+
+    totalScore += contribution;
+    totalPossibleScore += contributionMax;
 
     metrics[metricKey] = {
       label: metricConfig.label,
       raw_value: rawValue,
       normalized_score: normalizedScore,
-      weight: Number((priorityWeights[metricKey] ?? 0).toFixed(4)),
+      weight,
+      weighted_contribution: contribution,
+      weighted_contribution_display: `${contribution.toFixed(2)} / ${contributionMax.toFixed(2)}`,
+      normalization_context:
+        metricConfig.normalization === "dynamic_minmax" && stats
+          ? {
+              min: stats.min,
+              max: stats.max,
+            }
+          : null,
     };
 
     if (metricKey === "interest" && course.interest_fit) {
@@ -386,14 +409,15 @@ function attachPriorityDebug(course, priorityOrder, priorityWeights, metricStats
     }
   }
 
+  totalScore = Number(totalScore.toFixed(4));
+  totalPossibleScore = Number(totalPossibleScore.toFixed(4));
+
   return {
     ...course,
-    priority_score: calculateWeightedPriorityScore(
-      course,
-      priorityOrder,
-      priorityWeights,
-      metricStats
-    ),
+    total_score: totalScore,
+    total_score_display: `${totalScore.toFixed(2)} / ${totalPossibleScore.toFixed(2)}`,
+    priority_score: totalScore,
+    priority_score_display: `${totalScore.toFixed(2)} / ${totalPossibleScore.toFixed(2)}`,
     priority_metrics: metrics,
   };
 }
@@ -535,7 +559,10 @@ async function attachInterestScoresToCourses(courses, interestProfile) {
 
 function sortCoursesByWeightedPriority(courses, priorityOrder) {
   if (priorityOrder.length === 0) {
-    return courses;
+    return courses.map((course, index) => ({
+      ...course,
+      rank_number: index + 1,
+    }));
   }
 
   const priorityWeights = buildPriorityWeights(priorityOrder);
@@ -546,8 +573,8 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
   );
 
   enrichedCourses.sort((a, b) => {
-    const aScore = a.priority_score ?? -1;
-    const bScore = b.priority_score ?? -1;
+    const aScore = a.total_score ?? a.priority_score ?? -1;
+    const bScore = b.total_score ?? b.priority_score ?? -1;
 
     if (bScore !== aScore) {
       return bScore - aScore;
@@ -569,9 +596,10 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
       }
     }
 
-    // Extra tie-break for interest priority if both scores are same
-    const aHighMatches = a?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
-    const bHighMatches = b?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
+    const aHighMatches =
+      a?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
+    const bHighMatches =
+      b?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
 
     if (bHighMatches !== aHighMatches) {
       return bHighMatches - aHighMatches;
@@ -590,9 +618,11 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
     return aGap - bGap;
   });
 
-  return enrichedCourses;
+  return enrichedCourses.map((course, index) => ({
+    ...course,
+    rank_number: index + 1,
+  }));
 }
-
 module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibleCoursesForUser(
   queryParams
 ) {
