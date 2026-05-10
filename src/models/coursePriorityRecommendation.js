@@ -631,6 +631,7 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
     difference = 0,
     limit = null,
     uni_code = null,
+    band_min_percentage = 80
   } = queryParams;
 
   const priorityOrder = buildPriorityOrderFromQuery(queryParams);
@@ -646,7 +647,8 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
     userId,
     difference,
     limit,
-    uni_code
+    uni_code,
+    band_min_percentage
   );
 
   const rankedResults = [];

@@ -2,11 +2,12 @@ const prisma = require("../lib/prisma");
 const { getUserAlevelScores } = require("../utils/aLevelScoreUtils");
 
 const DEFAULT_DIFFERENCE = 0;
-
+const DEFAULT_BAND_MIN_PERCENTAGE = 80;
 const QUALIFICATION = {
   POLY: ["polytechnic", "poly"],
   JC: ["a-level", "a level", "jc", "junior college"],
 };
+
 
 function normalizeQualificationType(value) {
   return String(value || "").trim().toLowerCase();
@@ -19,6 +20,7 @@ function isPolyQualification(value) {
 function isJcQualification(value) {
   return QUALIFICATION.JC.includes(normalizeQualificationType(value));
 }
+
 
 function toNumber(value) {
   return value === null || value === undefined ? null : Number(value);
@@ -169,7 +171,8 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
   userId,
   difference = DEFAULT_DIFFERENCE,
   limit = null,
-  uniCode = null
+  uniCode = null,
+  band_min_percentage = DEFAULT_BAND_MIN_PERCENTAGE
 ) {
   const parsedUserId = parseInt(userId, 10);
   const parsedDifference = Number(difference ?? DEFAULT_DIFFERENCE);
@@ -178,6 +181,13 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       ? null
       : Number(limit);
   const normalizedUniCode = uniCode ? String(uniCode).trim().toUpperCase() : null;
+
+  const parsedBandMinPercentage =
+  band_min_percentage === null ||
+  band_min_percentage === undefined ||
+  band_min_percentage === ""
+    ? DEFAULT_BAND_MIN_PERCENTAGE
+    : Number(band_min_percentage);
 
   if (Number.isNaN(parsedUserId)) {
     throw new Error("Invalid userId");
@@ -190,6 +200,14 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
   if (parsedLimit !== null && Number.isNaN(parsedLimit)) {
     throw new Error("Invalid limit");
   }
+
+  if (Number.isNaN(parsedBandMinPercentage)) {
+  throw new Error("Invalid band_min_percentage");
+}
+
+if (parsedBandMinPercentage < 0 || parsedBandMinPercentage > 100) {
+  throw new Error("band_min_percentage must be between 0 and 100");
+}
 
   const academicProfiles = await prisma.userAcademicProfile.findMany({
     where: {
@@ -218,6 +236,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
         qualification_type: profile.qualification_type,
         benchmark_value: null,
         difference_used: parsedDifference,
+        band_min_percentage_used: parsedBandMinPercentage,
         uni_code: normalizedUniCode,
         courses: [],
       });
@@ -305,7 +324,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
         qualification_type: bandQualificationType,
         percentage_value: {
           not: null,
-          gt: 80,
+          gte: parsedBandMinPercentage,
         },
         ...(normalizedUniCode
           ? {
@@ -449,6 +468,7 @@ module.exports.getEligibleCoursesForUser = async function getEligibleCoursesForU
       difference_used: parsedDifference,
       uni_code: normalizedUniCode,
       courses: rankedCourses,
+      band_min_percentage_used: parsedBandMinPercentage,
     });
   }
 
