@@ -4,7 +4,6 @@ const { getEligibleCoursesForUser } = require("./courseRecommendationIGP");
 /**
  * Compressed fixed prestige scores.
  * These are INTERNAL APP HEURISTICS, not objective truth.
- * Important: prestige should NOT be min-max normalized against the current result set.
  */
 const BASE_PRESTIGE_SCORES = {
   NUS: 92,
@@ -16,12 +15,17 @@ const BASE_PRESTIGE_SCORES = {
 };
 
 /**
- * Metric registry.
- *
- * normalization:
- * - "dynamic_minmax" => normalize based on values inside current eligible result set
- * - "fixed_direct"   => use the raw metric value directly as a 0-100 style score
+ * Internal weights inside the INTEREST priority system.
+ * This is separate from the outer priority weighting.
  */
+const INTEREST_ZONE_WEIGHTS = {
+  high: 1.0,
+  medium: 0.5,
+  low: 0.2,
+};
+
+const INTEREST_RELEVANCE_MAX = 3;
+
 const PRIORITY_METRICS = {
   salary: {
     key: "salary",
@@ -51,6 +55,18 @@ const PRIORITY_METRICS = {
     getValue: (course) => {
       const universityCode = String(course?.university_code || "").toUpperCase();
       return BASE_PRESTIGE_SCORES[universityCode] ?? null;
+    },
+  },
+  interest: {
+    key: "interest",
+    label: "Interest Fit Score",
+    higherIsBetter: true,
+    normalization: "fixed_direct",
+    getValue: (course) => {
+      if (!course?.interest_fit?.score && course?.interest_fit?.score !== 0) {
+        return null;
+      }
+      return Number(course.interest_fit.score);
     },
   },
 };
@@ -88,6 +104,95 @@ function normalizePreferredUniversities(value) {
   }
 
   return [];
+}
+
+function parseInterestList(rawValue) {
+  if (!rawValue) {
+    return [];
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .flatMap((item) => String(item).split(","))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof rawValue === "string") {
+    const trimmed = rawValue.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    // Support JSON array strings too
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch (error) {
+        // fall back to comma split
+      }
+    }
+
+    return trimmed
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeInterestName(name) {
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function buildInterestProfileFromQuery(query) {
+  const high = parseInterestList(query.high_interests).map(normalizeInterestName);
+  const medium = parseInterestList(query.medium_interests).map(normalizeInterestName);
+  const low = parseInterestList(query.low_interests).map(normalizeInterestName);
+
+  return {
+    high: [...new Set(high)],
+    medium: [...new Set(medium)],
+    low: [...new Set(low)],
+  };
+}
+
+function getAllSelectedInterests(interestProfile) {
+  return [...interestProfile.high, ...interestProfile.medium, ...interestProfile.low];
+}
+
+function validateInterestProfile(interestProfile, priorityOrder) {
+  const selectedInterests = getAllSelectedInterests(interestProfile);
+  const includesInterestPriority = priorityOrder.includes("interest");
+
+  if (includesInterestPriority && selectedInterests.length === 0) {
+    throw new Error(
+      "interest_priority was provided but no interests were supplied. Pass high_interests, medium_interests, or low_interests."
+    );
+  }
+
+  const zoneByInterest = new Map();
+
+  for (const zone of ["high", "medium", "low"]) {
+    for (const interestName of interestProfile[zone]) {
+      const existingZone = zoneByInterest.get(interestName);
+
+      if (existingZone) {
+        throw new Error(
+          `Interest "${interestName}" appears in multiple zones (${existingZone} and ${zone}). Each interest must appear only once.`
+        );
+      }
+
+      zoneByInterest.set(interestName, zone);
+    }
+  }
 }
 
 async function getSavedPreferredUniversities(userId) {
@@ -166,11 +271,6 @@ function validatePrestigeUsage(priorityOrder, explicitUniCode, savedPreferredUni
   }
 }
 
-/**
- * Dynamic weights:
- * 3 priorities => 3/6, 2/6, 1/6
- * 2 priorities => 2/3, 1/3
- */
 function buildPriorityWeights(priorityOrder) {
   const n = priorityOrder.length;
 
@@ -279,6 +379,11 @@ function attachPriorityDebug(course, priorityOrder, priorityWeights, metricStats
       normalized_score: normalizedScore,
       weight: Number((priorityWeights[metricKey] ?? 0).toFixed(4)),
     };
+
+    if (metricKey === "interest" && course.interest_fit) {
+      metrics[metricKey].zones = course.interest_fit.zones;
+      metrics[metricKey].matched_interest_count = course.interest_fit.matched_interest_count;
+    }
   }
 
   return {
@@ -291,6 +396,141 @@ function attachPriorityDebug(course, priorityOrder, priorityWeights, metricStats
     ),
     priority_metrics: metrics,
   };
+}
+
+function calculateSingleInterestMatchScore(relevanceScore) {
+  const numericRelevance = toNumber(relevanceScore);
+
+  if (numericRelevance === null || numericRelevance <= 0) {
+    return 0;
+  }
+
+  return Number(((numericRelevance / INTEREST_RELEVANCE_MAX) * 100).toFixed(4));
+}
+
+async function attachInterestScoresToCourses(courses, interestProfile) {
+  const selectedInterests = getAllSelectedInterests(interestProfile);
+
+  if (!Array.isArray(courses) || courses.length === 0 || selectedInterests.length === 0) {
+    return courses;
+  }
+
+  const courseIds = courses
+    .map((course) => toNumber(course.course_id))
+    .filter((value) => value !== null);
+
+  if (courseIds.length === 0) {
+    return courses;
+  }
+
+  // Adjust model names here only if your Prisma client uses different names
+  const interestGroups = await prisma.interestGroup.findMany({
+    where: {
+      interest_name: {
+        in: selectedInterests,
+      },
+    },
+    select: {
+      interest_group_id: true,
+      interest_name: true,
+    },
+  });
+
+  const interestGroupMap = new Map(
+    interestGroups.map((group) => [group.interest_name, group.interest_group_id])
+  );
+
+  const selectedInterestGroupIds = interestGroups.map((group) => group.interest_group_id);
+
+  if (selectedInterestGroupIds.length === 0) {
+    return courses.map((course) => ({
+      ...course,
+      interest_fit: {
+        score: 0,
+        matched_interest_count: 0,
+        zones: {
+          high: [],
+          medium: [],
+          low: [],
+        },
+      },
+    }));
+  }
+
+  const courseInterestRows = await prisma.courseRelatedInterest.findMany({
+    where: {
+      course_id: {
+        in: courseIds,
+      },
+      interest_group_id: {
+        in: selectedInterestGroupIds,
+      },
+    },
+    select: {
+      course_id: true,
+      interest_group_id: true,
+      relevance_score: true,
+    },
+  });
+
+  const courseInterestMap = new Map();
+
+  for (const row of courseInterestRows) {
+    const key = `${row.course_id}:${row.interest_group_id}`;
+    courseInterestMap.set(key, toNumber(row.relevance_score) ?? 0);
+  }
+
+  return courses.map((course) => {
+    let weightedScoreSum = 0;
+    let totalPossibleWeight = 0;
+    let matchedInterestCount = 0;
+
+    const zoneDebug = {
+      high: [],
+      medium: [],
+      low: [],
+    };
+
+    for (const zone of ["high", "medium", "low"]) {
+      const zoneWeight = INTEREST_ZONE_WEIGHTS[zone];
+      const zoneInterests = interestProfile[zone];
+
+      for (const interestName of zoneInterests) {
+        const interestGroupId = interestGroupMap.get(interestName);
+        const relevanceScore = interestGroupId
+          ? courseInterestMap.get(`${course.course_id}:${interestGroupId}`) ?? 0
+          : 0;
+
+        const matchScore = calculateSingleInterestMatchScore(relevanceScore);
+
+        totalPossibleWeight += zoneWeight;
+        weightedScoreSum += matchScore * zoneWeight;
+
+        if (relevanceScore > 0) {
+          matchedInterestCount += 1;
+        }
+
+        zoneDebug[zone].push({
+          interest_name: interestName,
+          relevance_score: relevanceScore,
+          match_score: matchScore,
+          zone_weight: zoneWeight,
+        });
+      }
+    }
+
+    const finalInterestScore =
+      totalPossibleWeight > 0 ? Number((weightedScoreSum / totalPossibleWeight).toFixed(4)) : 0;
+
+    return {
+      ...course,
+      interest_fit: {
+        score: finalInterestScore,
+        matched_interest_count: matchedInterestCount,
+        zones: zoneDebug,
+      },
+    };
+  });
 }
 
 function sortCoursesByWeightedPriority(courses, priorityOrder) {
@@ -313,7 +553,6 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
       return bScore - aScore;
     }
 
-    // Tie-break by raw values according to priority order
     for (const metricKey of priorityOrder) {
       const metricConfig = PRIORITY_METRICS[metricKey];
       const aValue = metricConfig.getValue(a);
@@ -330,7 +569,14 @@ function sortCoursesByWeightedPriority(courses, priorityOrder) {
       }
     }
 
-    // Final fallback: closer admissions cutoff first
+    // Extra tie-break for interest priority if both scores are same
+    const aHighMatches = a?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
+    const bHighMatches = b?.interest_fit?.zones?.high?.filter((x) => x.relevance_score > 0).length ?? 0;
+
+    if (bHighMatches !== aHighMatches) {
+      return bHighMatches - aHighMatches;
+    }
+
     const aGap =
       a.cutoff_gap === null || a.cutoff_gap === undefined
         ? Number.POSITIVE_INFINITY
@@ -360,6 +606,9 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
   const priorityOrder = buildPriorityOrderFromQuery(queryParams);
   validatePriorityOrder(priorityOrder);
 
+  const interestProfile = buildInterestProfileFromQuery(queryParams);
+  validateInterestProfile(interestProfile, priorityOrder);
+
   const savedPreferredUniversities = await getSavedPreferredUniversities(userId);
   validatePrestigeUsage(priorityOrder, uni_code, savedPreferredUniversities);
 
@@ -370,29 +619,38 @@ module.exports.getRankedEligibleCoursesForUser = async function getRankedEligibl
     uni_code
   );
 
-  const rankedResults = eligibleData.results.map((profileResult) => {
+  const rankedResults = [];
+
+  for (const profileResult of eligibleData.results) {
     const originalCourses = Array.isArray(profileResult.courses)
       ? profileResult.courses
       : [];
 
+    const enrichedCourses = priorityOrder.includes("interest")
+      ? await attachInterestScoresToCourses(originalCourses, interestProfile)
+      : originalCourses;
+
     const rankedCourses =
       priorityOrder.length > 0
-        ? sortCoursesByWeightedPriority(originalCourses, priorityOrder)
-        : originalCourses;
+        ? sortCoursesByWeightedPriority(enrichedCourses, priorityOrder)
+        : enrichedCourses;
 
-    return {
+    rankedResults.push({
       ...profileResult,
       applied_priority_order: priorityOrder,
       applied_priority_weights: buildPriorityWeights(priorityOrder),
+      applied_interest_profile: interestProfile,
       saved_preferred_universities: savedPreferredUniversities,
       total_eligible_courses: originalCourses.length,
       courses: rankedCourses,
-    };
-  });
+    });
+  }
 
   return {
     ...eligibleData,
     available_priority_metrics: Object.keys(PRIORITY_METRICS),
+    available_interest_zones: Object.keys(INTEREST_ZONE_WEIGHTS),
+    interest_zone_weights: INTEREST_ZONE_WEIGHTS,
     prestige_score_map: BASE_PRESTIGE_SCORES,
     results: rankedResults,
   };
