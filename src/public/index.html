@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FindMyUniSG</title>
+  <style>
+    :root {
+      --bg: #f6f9fc;
+      --surface: #ffffff;
+      --surface-soft: #eef6ff;
+      --surface-blue: #e3f0ff;
+      --primary: #7fb3e8;
+      --primary-dark: #2f6fa8;
+      --primary-soft: #cfe5fb;
+      --text: #16202a;
+      --muted: #657385;
+      --border: #d7e3ef;
+      --danger: #c44b4b;
+      --success: #4b8f65;
+      --shadow: 0 18px 45px rgba(66, 118, 168, 0.12);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 999px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 45%, #f9fbff 100%);
+      color: var(--text);
+    }
+
+    button, input, select { font: inherit; }
+
+    .app-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 22px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(215, 227, 239, 0.9);
+      backdrop-filter: blur(18px);
+      border-radius: 0 0 22px 22px;
+      box-shadow: 0 10px 30px rgba(80, 128, 176, 0.08);
+    }
+
+    .brand {
+      font-weight: 750;
+      letter-spacing: -0.03em;
+      color: var(--primary-dark);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-link {
+      position: relative;
+      border: 0;
+      background: transparent;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--muted);
+      transition: color 180ms ease, transform 180ms ease;
+    }
+
+    .nav-link:hover { color: var(--primary-dark); transform: translateY(-1px); }
+    .nav-link.active { color: var(--text); }
+
+    .nav-link.active::after {
+      content: "";
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 3px;
+      height: 3px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, transparent 0%, var(--primary) 28%, var(--primary-dark) 100%);
+      animation: activeFade 650ms ease both;
+    }
+
+    @keyframes activeFade {
+      from { transform: scaleX(0); transform-origin: left; opacity: 0; }
+      to { transform: scaleX(1); transform-origin: left; opacity: 1; }
+    }
+
+    .page { display: none; padding: 34px 0 60px; }
+    .page.active { display: block; animation: pageIn 240ms ease both; }
+
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-title {
+      margin: 0 0 22px;
+      font-size: clamp(1.7rem, 4vw, 2.8rem);
+      letter-spacing: -0.055em;
+      line-height: 1.05;
+    }
+
+    .grid { display: grid; gap: 20px; }
+    .grid.two { grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1.15fr); }
+
+    .card {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .card h2, .card h3 { margin-top: 0; letter-spacing: -0.035em; }
+    .muted { color: var(--muted); }
+
+    .form-grid {
+      display: grid;
+      gap: 15px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: 650;
+      font-size: 0.92rem;
+    }
+
+    .input, .select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 14px;
+      padding: 11px 12px;
+      outline: none;
+      transition: border 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+
+    .input:focus, .select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(127, 179, 232, 0.18);
+    }
+
+    .tier-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+
+    .tier-list {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .tier-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      min-height: 72px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tier-row:last-child { border-bottom: 0; }
+
+    .tier-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 750;
+      background: var(--surface-blue);
+    }
+
+    .tier-dropzone {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 42px 14px 14px;
+      background: linear-gradient(135deg, #fbfdff, #eef6ff);
+    }
+
+    .plus-btn {
+      position: absolute;
+      top: 50%;
+      right: 12px;
+      translate: 0 -50%;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--primary-dark);
+      color: #fff;
+      cursor: pointer;
+      opacity: 0;
+      transform: scale(0.88);
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .tier-row:hover .plus-btn { opacity: 1; transform: scale(1); }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 11px;
+      background: #fff;
+      font-size: 0.86rem;
+      font-weight: 650;
+      cursor: grab;
+      box-shadow: 0 6px 16px rgba(55, 105, 155, 0.08);
+      user-select: none;
+    }
+
+    .pill button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      place-items: center;
+      background: rgba(22, 32, 42, 0.28);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+    }
+
+    .modal-backdrop.active { display: grid; }
+
+    .modal {
+      width: min(560px, 100%);
+      max-height: 78vh;
+      overflow: auto;
+      border-radius: 26px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 30px 80px rgba(35, 75, 115, 0.25);
+      padding: 22px;
+      animation: modalIn 180ms ease both;
+    }
+
+    @keyframes modalIn {
+      from { transform: translateY(12px) scale(0.98); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .icon-btn {
+      border: 0;
+      background: var(--surface-soft);
+      border-radius: 12px;
+      padding: 9px 12px;
+      cursor: pointer;
+    }
+
+    .interest-results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .interest-choice {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: border 160ms ease, transform 160ms ease, background 160ms ease;
+    }
+
+    .interest-choice:hover { border-color: var(--primary); transform: translateY(-1px); background: var(--surface-soft); }
+
+    .priority-board {
+      display: grid;
+      gap: 12px;
+    }
+
+    .priority-row {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      min-height: 78px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+    }
+
+    .priority-number {
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      background: var(--surface-blue);
+    }
+
+    .priority-zone {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+      padding: 14px;
+      background: linear-gradient(135deg, #fbfdff, #edf6ff);
+    }
+
+    .option-bank { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .drag-over { outline: 3px solid rgba(127, 179, 232, 0.45); outline-offset: -5px; }
+
+    .checkbox-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .check-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      font-weight: 650;
+    }
+
+    .check-card input { width: 18px; height: 18px; accent-color: var(--primary-dark); }
+
+    .error {
+      display: none;
+      margin-top: 9px;
+      padding: 11px 12px;
+      border-radius: 14px;
+      background: #fff1f1;
+      border: 1px solid #f1bbbb;
+      color: var(--danger);
+      font-weight: 650;
+      font-size: 0.9rem;
+    }
+
+    .error.active { display: block; }
+
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin: 20px 0;
+    }
+
+    .filter-chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--muted);
+      border-radius: var(--radius-sm);
+      padding: 8px 15px;
+      font-weight: 750;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease, border 160ms ease;
+    }
+
+    .filter-chip.active, .filter-chip:hover {
+      background: var(--primary-dark);
+      color: #fff;
+      border-color: var(--primary-dark);
+    }
+
+    .course-list { display: grid; gap: 14px; }
+
+    .course-card {
+      display: grid;
+      grid-template-columns: 52px 1fr auto;
+      gap: 15px;
+      align-items: center;
+      padding: 18px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 14px 36px rgba(66, 118, 168, 0.1);
+      transition: transform 170ms ease, box-shadow 170ms ease;
+    }
+
+    .course-card:hover { transform: translateY(-2px); box-shadow: 0 18px 42px rgba(66, 118, 168, 0.15); }
+
+    .rank {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: var(--surface-blue);
+      font-weight: 850;
+      color: var(--primary-dark);
+    }
+
+    .course-main {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 10px 20px;
+    }
+
+    .course-name { font-weight: 850; }
+    .course-meta { color: var(--muted); font-size: 0.9rem; }
+
+    .score-box { text-align: right; }
+    .score { font-size: 1.25rem; font-weight: 900; color: var(--primary-dark); }
+    .read-more {
+      margin-top: 9px;
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: var(--surface-soft);
+      color: var(--primary-dark);
+      padding: 8px 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .details {
+      display: none;
+      grid-column: 2 / -1;
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .details.active { display: block; }
+
+    .empty-state {
+      padding: 26px;
+      border: 1px dashed var(--border);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.6);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .disabled-field {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    @media (max-width: 900px) {
+      .grid.two, .tier-columns, .course-main, .checkbox-row { grid-template-columns: 1fr; }
+      .course-card { grid-template-columns: 46px 1fr; }
+      .score-box { grid-column: 2; text-align: left; }
+      .details { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 560px) {
+      .app-shell { padding: 10px; }
+      .navbar { padding: 13px 14px; border-radius: 0 0 18px 18px; }
+      .brand { font-size: 0.95rem; }
+      .nav-link { padding: 8px 9px; }
+      .card { padding: 17px; border-radius: 20px; }
+      .tier-row { grid-template-columns: 58px 1fr; }
+      .hero-title { margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <nav class="navbar">
+      <div class="brand">FindMyUniSG</div>
+      <div class="nav-links">
+        <button class="nav-link active" data-page="courseFinderPage">Course Finder</button>
+        <button class="nav-link" data-page="profilePage">Profile</button>
+      </div>
+    </nav>
+
+    <section id="courseFinderPage" class="page active">
+      <h1 class="hero-title">Find courses that fit you.</h1>
+
+      <div class="grid two">
+        <section class="card">
+          <h2>Course filter</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="gpaBoost">GPA boost</label>
+              <input id="gpaBoost" class="input" type="number" step="0.01" value="0.00" />
+            </div>
+
+            <div id="preferredUniField" class="field">
+              <label for="preferredUniversities">Preferred universities</label>
+              <select id="preferredUniversities" class="select" multiple size="4">
+                <option>NUS</option>
+                <option>NTU</option>
+                <option>SMU</option>
+                <option>SUTD</option>
+                <option>SIT</option>
+                <option>SUSS</option>
+              </select>
+              <div id="prestigeError" class="error">Preferred universities is disabled because Prestige is already selected as a priority. Remove Prestige from the priority space to choose preferred universities manually.</div>
+            </div>
+
+            <div class="field">
+              <label for="courseKeyword">Course keyword</label>
+              <input id="courseKeyword" class="input" type="search" placeholder="e.g. engineering, business, computing" />
+            </div>
+          </div>
+
+          <div class="checkbox-row">
+            <label class="check-card"><input id="onlyWanted" type="checkbox" checked /> Only include courses with favoured interests</label>
+            <label class="check-card"><input id="excludeUnwanted" type="checkbox" /> Exclude courses with unfavoured interests</label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Priority space</h2>
+          <p class="muted">Drag options into the numbered rows. Higher rows affect ranking first.</p>
+
+          <div class="priority-board">
+            <div class="priority-row">
+              <div class="priority-number">1</div>
+              <div class="priority-zone" data-priority="1"></div>
+            </div>
+            <div class="priority-row">
+              <div class="priority-number">2</div>
+              <div class="priority-zone" data-priority="2"></div>
+            </div>
+            <div class="priority-row">
+              <div class="priority-number">3</div>
+              <div class="priority-zone" data-priority="3"></div>
+            </div>
+          </div>
+
+          <h3 style="margin-top: 20px;">Priority options</h3>
+          <div id="priorityBank" class="option-bank">
+            <span class="pill priority-pill" draggable="true" data-option="interests">Interests</span>
+            <span class="pill priority-pill" draggable="true" data-option="prestige">Prestige</span>
+            <span class="pill priority-pill" draggable="true" data-option="salary">Salary</span>
+            <span class="pill priority-pill" draggable="true" data-option="employability">Employability</span>
+          </div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top: 20px;">
+        <h2>Recommended courses</h2>
+        <div id="universityFilters" class="filter-bar"></div>
+        <div id="courseList" class="course-list"></div>
+      </section>
+    </section>
+
+    <section id="profilePage" class="page">
+      <h1 class="hero-title">Profile</h1>
+
+      <div class="grid two">
+        <section class="card">
+          <h2>Personal details</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="fullName">Name</label>
+              <input id="fullName" class="input" type="text" placeholder="Your name" />
+            </div>
+            <div class="field">
+              <label for="qualification">Qualification</label>
+              <select id="qualification" class="select">
+                <option value="Diploma">Diploma</option>
+                <option value="A Level">A Level</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="school">School</label>
+              <input id="school" class="input" type="text" placeholder="School name" />
+            </div>
+            <div class="field">
+              <label for="course">Course</label>
+              <input id="course" class="input" type="text" placeholder="Course name" />
+            </div>
+            <div class="field">
+              <label for="gradYear">Graduation year</label>
+              <select id="gradYear" class="select">
+                <option value="">Select year</option>
+                <option>2025</option><option>2026</option><option>2027</option><option>2028</option>
+              </select>
+            </div>
+            <div class="field" id="scoreField">
+              <label id="scoreLabel" for="academicScore">GPA</label>
+              <input id="academicScore" class="input" type="number" step="0.01" min="0" max="4" placeholder="e.g. 3.45" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Interests tier list</h2>
+          <div class="tier-columns">
+            <div>
+              <h3>Favoured interests</h3>
+              <div class="tier-list" data-kind="wanted">
+                <div class="tier-row" data-tier="high"><div class="tier-label">High</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+                <div class="tier-row" data-tier="medium"><div class="tier-label">Med</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+                <div class="tier-row" data-tier="low"><div class="tier-label">Low</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+              </div>
+            </div>
+            <div>
+              <h3>Unfavoured interests</h3>
+              <div class="tier-list" data-kind="unwanted">
+                <div class="tier-row" data-tier="high"><div class="tier-label">High</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+                <div class="tier-row" data-tier="medium"><div class="tier-label">Med</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+                <div class="tier-row" data-tier="low"><div class="tier-label">Low</div><div class="tier-dropzone"></div><button class="plus-btn">+</button></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="interestModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 style="margin: 0;">Add interest</h2>
+          <p id="modalContext" class="muted" style="margin: 5px 0 0;"></p>
+        </div>
+        <button id="closeModal" class="icon-btn">Close</button>
+      </div>
+      <input id="interestSearch" class="input" type="search" placeholder="Search interests..." />
+      <div id="interestResults" class="interest-results"></div>
+    </div>
+  </div>
+
+  <script>
+    
+
+    const API_BASE_URL = "";
+    const CURRENT_USER_ID = 9;
+
+    let interests = [];
+    let apiPayload = null;
+    let allCourses = [];
+    let latestCourseRequestId = 0;
+    let courseAbortController = null;
+
+    const state = {
+      page: "courseFinderPage",
+      activeUni: "All",
+      isLoadingCourses: false,
+      apiError: null,
+      modalTarget: null,
+      draggedOption: null,
+      priority: { 1: ["interest"], 2: ["prestige"], 3: ["salary"] },
+      selectedInterests: {
+        wanted: { high: ["Law"], medium: [], low: [] },
+        unwanted: { high: ["Computing", "Engineering", "Mathematics", "Physics"], medium: ["Sports", "Natural Sciences"], low: [] }
+      }
+    };
+
+    const navLinks = document.querySelectorAll(".nav-link");
+    const pages = document.querySelectorAll(".page");
+
+    navLinks.forEach(link => {
+      link.addEventListener("click", () => {
+        state.page = link.dataset.page;
+        navLinks.forEach(item => item.classList.toggle("active", item === link));
+        pages.forEach(page => page.classList.toggle("active", page.id === state.page));
+      });
+    });
+
+    const qualification = document.getElementById("qualification");
+    const scoreLabel = document.getElementById("scoreLabel");
+    const academicScore = document.getElementById("academicScore");
+
+    qualification.addEventListener("change", () => {
+      const isDiploma = qualification.value === "Diploma";
+      scoreLabel.textContent = isDiploma ? "GPA" : "RP";
+      academicScore.placeholder = isDiploma ? "e.g. 3.45" : "e.g. 78.75";
+      academicScore.max = isDiploma ? "4" : "90";
+      academicScore.step = isDiploma ? "0.01" : "0.1";
+      academicScore.value = "";
+    });
+
+    async function loadUserProfile() {
+  try {
+    const response = await fetch(`/users/${CURRENT_USER_ID}/profile`);
+    const json = await response.json();
+
+    if (!response.ok) throw new Error(json.error || json.message);
+
+    const user = json.data;
+    const profile = user.academic_profiles?.[0];
+
+    document.getElementById("fullName").value = user.full_name || "";
+    document.getElementById("school").value = profile?.institution_name || "";
+    document.getElementById("course").value = profile?.diploma_name || "";
+    document.getElementById("gradYear").value = profile?.graduation_year || "";
+
+    const qualification = String(profile?.qualification_type || "").toLowerCase();
+    const isAlevel = qualification.includes("a-level") || qualification.includes("a level") || qualification.includes("jc");
+
+    document.getElementById("qualification").value = isAlevel ? "A Level" : "Diploma";
+    document.getElementById("qualification").dispatchEvent(new Event("change"));
+
+    document.getElementById("academicScore").value = isAlevel
+      ? profile?.rank_points || profile?.uas_70 || ""
+      : profile?.projected_gpa || profile?.current_gpa || "";
+  } catch (error) {
+    console.warn("Unable to load user profile:", error.message);
+  }
+}
+
+    function makePill(name, onRemove) {
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.innerHTML = `<span>${name}</span><button type="button" aria-label="Remove ${name}">×</button>`;
+      pill.querySelector("button").addEventListener("click", onRemove);
+      return pill;
+    }
+
+    function renderTierLists() {
+      document.querySelectorAll(".tier-list").forEach(list => {
+        const kind = list.dataset.kind;
+        list.querySelectorAll(".tier-row").forEach(row => {
+          const tier = row.dataset.tier;
+          const zone = row.querySelector(".tier-dropzone");
+          zone.innerHTML = "";
+          state.selectedInterests[kind][tier].forEach(name => {
+            zone.appendChild(makePill(name, () => {
+  state.selectedInterests[kind][tier] =
+    state.selectedInterests[kind][tier].filter(item => item !== name);
+
+  renderTierLists();
+  fetchRankedCourses();
+}));
+          });
+        });
+      });
+    }
+
+    const modal = document.getElementById("interestModal");
+    const modalContext = document.getElementById("modalContext");
+    const interestSearch = document.getElementById("interestSearch");
+    const interestResults = document.getElementById("interestResults");
+
+    document.querySelectorAll(".plus-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const row = btn.closest(".tier-row");
+        const list = btn.closest(".tier-list");
+        state.modalTarget = { kind: list.dataset.kind, tier: row.dataset.tier };
+        modalContext.textContent = `${state.modalTarget.kind === "wanted" ? "Favoured" : "Unfavoured"} · ${state.modalTarget.tier}`;
+        interestSearch.value = "";
+        modal.classList.add("active");
+        interestSearch.focus();
+        renderInterestChoices();
+      });
+    });
+
+    document.getElementById("closeModal").addEventListener("click", () => modal.classList.remove("active"));
+    modal.addEventListener("click", event => {
+      if (event.target === modal) modal.classList.remove("active");
+    });
+
+    interestSearch.addEventListener("input", renderInterestChoices);
+
+    async function loadInterests() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/interest-groups`);
+        if (!response.ok) throw new Error("Unable to load interest groups");
+        const json = await response.json();
+        const rows = Array.isArray(json.data) ? json.data : [];
+        interests = rows
+          .map(item => item.interest_name || item.name || item)
+          .filter(Boolean)
+          .map(String)
+          .sort((a, b) => a.localeCompare(b));
+      } catch (error) {
+        interests = [];
+        console.warn("Interest groups endpoint missing or unavailable:", error.message);
+      }
+    }
+
+    function renderInterestChoices() {
+      const query = interestSearch.value.trim().toLowerCase();
+      const matches = interests.filter(item => item.toLowerCase().includes(query));
+      interestResults.innerHTML = "";
+
+      if (!interests.length) {
+        interestResults.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">No interests loaded. Add a GET /interest-groups endpoint that returns your InterestGroup rows.</div>`;
+        return;
+      }
+
+      matches.forEach(item => {
+        const btn = document.createElement("button");
+        btn.className = "interest-choice";
+        btn.textContent = item;
+        btn.addEventListener("click", () => {
+          const { kind, tier } = state.modalTarget;
+          const current = state.selectedInterests[kind][tier];
+          if (!current.includes(item)) current.push(item);
+          modal.classList.remove("active");
+          renderTierLists();
+          fetchRankedCourses();
+        });
+        interestResults.appendChild(btn);
+      });
+    }
+
+    const priorityBank = document.getElementById("priorityBank");
+
+    function createPriorityPill(option) {
+      const span = document.createElement("span");
+      span.className = "pill priority-pill";
+      span.draggable = true;
+      span.dataset.option = option;
+      span.textContent = option[0].toUpperCase() + option.slice(1);
+      attachPriorityDrag(span);
+      return span;
+    }
+
+    function attachPriorityDrag(el) {
+      el.addEventListener("dragstart", () => {
+        state.draggedOption = el.dataset.option;
+      });
+    }
+
+    document.querySelectorAll(".priority-pill").forEach(attachPriorityDrag);
+
+    document.querySelectorAll(".priority-zone, #priorityBank").forEach(zone => {
+      zone.addEventListener("dragover", event => {
+        event.preventDefault();
+        zone.classList.add("drag-over");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+      zone.addEventListener("drop", event => {
+        event.preventDefault();
+        zone.classList.remove("drag-over");
+        const option = state.draggedOption;
+        if (!option) return;
+
+        Object.keys(state.priority).forEach(key => {
+          state.priority[key] = state.priority[key].filter(item => item !== option);
+        });
+
+        if (zone.id !== "priorityBank") {
+          const priority = zone.dataset.priority;
+          if (!state.priority[priority].includes(option)) state.priority[priority].push(option);
+        }
+
+        state.draggedOption = null;
+        renderPriority();
+        updatePrestigeLock();
+        fetchRankedCourses();
+      });
+    });
+
+    function renderPriority() {
+      document.querySelectorAll(".priority-zone").forEach(zone => {
+        zone.innerHTML = "";
+        state.priority[zone.dataset.priority].forEach(option => zone.appendChild(createPriorityPill(option)));
+      });
+
+      priorityBank.innerHTML = "";
+      ["interests", "prestige", "salary", "employability"].forEach(option => {
+        const used = Object.values(state.priority).flat().includes(option);
+        if (!used) priorityBank.appendChild(createPriorityPill(option));
+      });
+    }
+
+    function updatePrestigeLock() {
+      const hasPrestige = Object.values(state.priority).flat().includes("prestige");
+      document.getElementById("preferredUniField").classList.toggle("disabled-field", hasPrestige);
+      document.getElementById("prestigeError").classList.toggle("active", hasPrestige);
+      if (hasPrestige) [...document.getElementById("preferredUniversities").options].forEach(option => option.selected = false);
+    }
+
+    function debounce(fn, delay = 350) {
+      let timeoutId;
+      return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn(...args), delay);
+      };
+    }
+
+    function csv(values) {
+      return values.map(value => String(value).trim()).filter(Boolean).join(",");
+    }
+
+    function getPriorityQueryParams(params) {
+      Object.entries(state.priority).forEach(([priorityNumber, metrics]) => {
+        metrics.forEach(metric => {
+          const normalizedMetric = metric === "interests" ? "interest" : metric;
+          params.set(`${normalizedMetric}_priority`, priorityNumber);
+        });
+      });
+    }
+
+    function getSelectedUniversityCsv() {
+      return [...document.getElementById("preferredUniversities").selectedOptions]
+        .map(option => option.value || option.textContent)
+        .filter(Boolean)
+        .join(",");
+    }
+
+    function buildRecommendationQuery() {
+      const params = new URLSearchParams();
+      params.set("userId", CURRENT_USER_ID);
+      params.set("difference", document.getElementById("gpaBoost").value || "0");
+      params.set("exclude_unwanted_interests", document.getElementById("excludeUnwanted").checked ? "true" : "false");
+      params.set("only_wanted_interests", document.getElementById("onlyWanted").checked ? "true" : "false");
+
+      const preferredUniversities = getSelectedUniversityCsv();
+      const hasPrestige = Object.values(state.priority).flat().includes("prestige");
+      if (preferredUniversities && !hasPrestige) params.set("uni_code", preferredUniversities);
+
+      params.set("high_interests", csv(state.selectedInterests.wanted.high));
+      params.set("medium_interests", csv(state.selectedInterests.wanted.medium));
+      params.set("low_interests", csv(state.selectedInterests.wanted.low));
+      params.set("high_unwanted_interests", csv(state.selectedInterests.unwanted.high));
+      params.set("medium_unwanted_interests", csv(state.selectedInterests.unwanted.medium));
+      params.set("low_unwanted_interests", csv(state.selectedInterests.unwanted.low));
+
+      getPriorityQueryParams(params);
+      return params;
+    }
+
+    function flattenCoursesFromPayload(payload) {
+      const results = payload?.data?.results || payload?.results || [];
+      return results.flatMap(result => Array.isArray(result.courses) ? result.courses : []);
+    }
+
+    async function fetchRankedCourses() {
+  const requestId = ++latestCourseRequestId;
+
+  if (courseAbortController) {
+    courseAbortController.abort();
+  }
+
+  courseAbortController = new AbortController();
+
+  state.isLoadingCourses = true;
+  state.apiError = null;
+  renderCourses();
+
+  try {
+    const params = buildRecommendationQuery();
+
+    const response = await fetch(
+      `/course-priority-recommendation/eligible-ranked-courses?${params.toString()}`,
+      { signal: courseAbortController.signal }
+    );
+
+    const json = await response.json();
+
+    if (requestId !== latestCourseRequestId) return;
+
+    if (!response.ok) {
+      throw new Error(json.error || json.message || "Failed to fetch recommendations");
+    }
+
+    apiPayload = json;
+    allCourses = flattenCoursesFromPayload(json);
+    state.activeUni = "All";
+
+    renderUniversityFilters();
+    renderCourses();
+  } catch (error) {
+    if (error.name === "AbortError") return;
+
+    if (requestId !== latestCourseRequestId) return;
+
+    apiPayload = null;
+    allCourses = [];
+    state.apiError = error.message;
+
+    renderUniversityFilters();
+    renderCourses();
+  } finally {
+    if (requestId === latestCourseRequestId) {
+      state.isLoadingCourses = false;
+      renderCourses();
+    }
+  }
+}
+
+    const debouncedFetchRankedCourses = debounce(fetchRankedCourses, 450);
+
+    const universityFilters = document.getElementById("universityFilters");
+    const courseList = document.getElementById("courseList");
+    const courseKeyword = document.getElementById("courseKeyword");
+
+    function renderUniversityFilters() {
+      const source = allCourses.length ? allCourses : [];
+      const universities = ["All", ...new Set(source.map(course => course.university_code).filter(Boolean))];
+      universityFilters.innerHTML = "";
+
+      if (!universities.length || universities.length === 1) return;
+
+      universities.forEach(uni => {
+        const btn = document.createElement("button");
+        btn.className = `filter-chip ${state.activeUni === uni ? "active" : ""}`;
+        btn.textContent = uni;
+        btn.addEventListener("click", () => {
+          state.activeUni = uni;
+          renderUniversityFilters();
+          renderCourses();
+        });
+        universityFilters.appendChild(btn);
+      });
+    }
+
+    function valueOrDash(value, suffix = "") {
+      if (value === null || value === undefined || value === "") return "—";
+      return `${value}${suffix}`;
+    }
+
+    function moneyOrDash(value) {
+      if (value === null || value === undefined || value === "") return "—";
+      return `$${Number(value).toLocaleString()}`;
+    }
+
+    function getScore(course) {
+      const score = course.total_score ?? course.priority_score;
+      return score === null || score === undefined ? "—" : `${Number(score).toFixed(1)}/100`;
+    }
+
+    function getMatchedInterests(course) {
+      const wantedMatches = course?.interest_fit?.wanted_matches || [];
+      return wantedMatches.map(item => `${item.interest_name} (${item.relevance_score}/3)`).join(", ") || "No wanted interest match";
+    }
+
+    function getPriorityBreakdown(course) {
+      const metrics = course.priority_metrics || {};
+      return Object.entries(metrics).map(([key, metric]) => {
+        const rawValue = metric.raw_value === null || metric.raw_value === undefined ? "—" : metric.raw_value;
+        return `<span class="pill" style="cursor: default;">${metric.label || key}: ${rawValue} · ${metric.weighted_contribution_display || "—"}</span>`;
+      }).join("");
+    }
+
+    function renderCourses() {
+      const keyword = courseKeyword.value.trim().toLowerCase();
+
+      if (state.isLoadingCourses) {
+        courseList.innerHTML = `<div class="empty-state">Loading ranked eligible courses...</div>`;
+        return;
+      }
+
+      if (state.apiError) {
+        courseList.innerHTML = `<div class="empty-state" style="color: var(--danger);">${state.apiError}</div>`;
+        return;
+      }
+
+      const filtered = allCourses.filter(course => {
+        const uniMatch = state.activeUni === "All" || course.university_code === state.activeUni;
+        const keywordMatch = !keyword || String(course.course_name || "").toLowerCase().includes(keyword);
+        return uniMatch && keywordMatch;
+      });
+
+      courseList.innerHTML = "";
+      if (!filtered.length) {
+        courseList.innerHTML = `<div class="empty-state">No eligible courses match the current filters.</div>`;
+        return;
+      }
+
+      filtered.forEach((course, index) => {
+        const card = document.createElement("article");
+        card.className = "course-card";
+        card.innerHTML = `
+          <div class="rank">${course.rank_number || index + 1}</div>
+          <div class="course-main">
+            <div>
+              <div class="course-name">${course.course_name}</div>
+              <div class="course-meta">${course.university_code || "—"} · ${valueOrDash(course.matched_via)}</div>
+            </div>
+            <div>
+              <div><strong>Median gross salary:</strong> ${moneyOrDash(course.ges?.gross_monthly_median)}</div>
+              <div><strong>Employability:</strong> ${valueOrDash(course.ges?.employment_rate_overall, "%")}</div>
+              <div class="course-meta">Cutoff gap: ${valueOrDash(course.cutoff_gap)} · Intake: ${valueOrDash(course.intake_size)}</div>
+            </div>
+          </div>
+          <div class="score-box">
+            <div class="score">${getScore(course)}</div>
+            <button class="read-more">Read more</button>
+          </div>
+          <div class="details">
+            <strong>Admissions</strong><br />
+            Min GPA: ${valueOrDash(course.min_gpa)} · 10th percentile RP: ${valueOrDash(course.tenth_percentile_rp)} · UAS 70: ${valueOrDash(course.tenth_percentile_uas_70)}<br />
+            Year recorded: ${valueOrDash(course.year_recorded)} · Source year: ${valueOrDash(course.ges?.source_year)}<br /><br />
+            <strong>Interest fit</strong><br />
+            Interest score: ${valueOrDash(course.interest_fit?.score)} · Wanted score: ${valueOrDash(course.interest_fit?.wanted_score)} · Unwanted penalty: ${valueOrDash(course.interest_fit?.unwanted_penalty)}<br />
+            Matched wanted interests: ${getMatchedInterests(course)}<br /><br />
+            <strong>Priority breakdown</strong><br />
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;">${getPriorityBreakdown(course)}</div>
+          </div>
+        `;
+        card.querySelector(".read-more").addEventListener("click", () => {
+          card.querySelector(".details").classList.toggle("active");
+        });
+        courseList.appendChild(card);
+      });
+    }
+
+    courseKeyword.addEventListener("input", renderCourses);
+    document.getElementById("gpaBoost").addEventListener("input", debouncedFetchRankedCourses);
+    document.getElementById("preferredUniversities").addEventListener("change", fetchRankedCourses);
+    document.getElementById("onlyWanted").addEventListener("change", fetchRankedCourses);
+    document.getElementById("excludeUnwanted").addEventListener("change", fetchRankedCourses);
+
+    async function init() {
+  renderTierLists();
+  renderPriority();
+  updatePrestigeLock();
+  renderUniversityFilters();
+  renderCourses();
+
+  await loadUserProfile();
+  await loadInterests();
+  await fetchRankedCourses();
+}
+
+    init();
+  </script>
+</body>
+</html>
