@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Course Finder | FindMyUniSG</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <nav class="navbar">
+      <a class="brand" href="/course-finder.html">FindMyUniSG</a>
+      <div class="nav-links">
+        <a class="nav-link active" href="/course-finder.html">Course Finder</a>
+        <a class="nav-link" href="/compare.html">Compare</a>
+        <a class="nav-link" href="/profile.html">Profile</a>
+        
+      </div>
+    </nav>
+
+    <section class="page active">
+      <h1 class="hero-title">Find courses that fit you.</h1>
+
+      <div class="grid two">
+        <section class="card">
+          <h2>Course filter</h2>
+
+          <div class="form-grid">
+            <div class="field">
+  <label id="boostLabel" for="gpaBoost">Academic boost</label>
+  <input id="gpaBoost" class="input" type="number" step="0.01" value="0.00" />
+</div>
+
+<div class="field">
+              <label id="academicScoreLabel" for="academicScore">GPA</label>
+              <input id="academicScore" class="input" type="text" readonly />
+            </div>
+
+            <div id="preferredUniField" class="field">
+              <label for="preferredUniversities">Preferred universities</label>
+              <select id="preferredUniversities" class="select" multiple size="6">
+                <option value="NUS">NUS</option>
+                <option value="NTU">NTU</option>
+                <option value="SMU">SMU</option>
+                <option value="SUTD">SUTD</option>
+                <option value="SIT">SIT</option>
+                <option value="SUSS">SUSS</option>
+              </select>
+
+              <div id="prestigeError" class="error">
+                Preferred universities is disabled because Prestige is already selected as a priority.
+                Remove Prestige from the priority space to choose preferred universities manually.
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="courseKeyword">Course keyword</label>
+              <input id="courseKeyword" class="input" type="search" placeholder="e.g. law, computing, engineering" />
+            </div>
+          </div>
+
+          <div class="checkbox-row">
+            <label class="check-card">
+              <input id="onlyWanted" type="checkbox" />
+              Only wanted interests
+            </label>
+
+            <label class="check-card">
+              <input id="excludeUnwanted" type="checkbox" />
+              Exclude unwanted interests
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Priority space</h2>
+          <p class="muted">Drag options into the numbered rows. Higher rows affect ranking first.</p>
+
+         
+<div class="priority-board">
+  <div class="priority-row">
+    <div class="priority-number">1</div>
+    <div class="priority-zone" data-priority="1"></div>
+  </div>
+
+  <div class="priority-row">
+    <div class="priority-number">2</div>
+    <div class="priority-zone" data-priority="2"></div>
+  </div>
+
+  <div class="priority-row">
+    <div class="priority-number">3</div>
+    <div class="priority-zone" data-priority="3"></div>
+  </div>
+
+  <div class="priority-row">
+    <div class="priority-number">4</div>
+    <div class="priority-zone" data-priority="4"></div>
+  </div>
+</div>
+
+          <h3 style="margin-top: 20px;">Priority options</h3>
+
+          <div id="priorityBank" class="option-bank"></div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top: 20px;">
+        <h2>Recommended courses</h2>
+
+        <div id="universityFilters" class="filter-bar"></div>
+
+        <div class="compare-toolbar">
+          <button id="toggleCompareMode" class="secondary-btn">Compare courses</button>
+        </div>
+
+        <div id="courseList" class="course-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <button id="goCompareBtn" class="sticky-compare-btn" disabled>
+    Select at least 2 courses
+  </button>
+
+  <script src="/js/shared.js"></script>
+  <script src="/js/course-finder.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile | FindMyUniSG</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <nav class="navbar">
+      <a class="brand" href="/course-finder.html">FindMyUniSG</a>
+      <div class="nav-links">
+        <a class="nav-link" href="/course-finder.html">Course Finder</a>
+        <a class="nav-link" href="/compare.html">Compare</a>
+        <a class="nav-link active" href="/profile.html">Profile</a>
+        
+      </div>
+    </nav>
+
+    <section class="page active">
+      <h1 class="hero-title">Profile</h1>
+
+      <div class="grid two">
+        <section class="card">
+          <h2>Personal details</h2>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="fullName">Name</label>
+              <input id="fullName" class="input" type="text" readonly />
+            </div>
+
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" class="input" type="email" readonly />
+            </div>
+
+            <div class="field">
+              <label for="qualification">Qualification</label>
+              <select id="qualification" class="select">
+                <option value="Diploma">Diploma</option>
+                <option value="A Level">A Level</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="school">School</label>
+              <input id="school" class="input" type="text" readonly />
+            </div>
+
+            <div class="field">
+              <label for="course">Course</label>
+              <input id="course" class="input" type="text" readonly />
+            </div>
+
+            <div class="field">
+              <label for="gradYear">Graduation year</label>
+              <input id="gradYear" class="input" type="text" readonly />
+            </div>
+
+            <div class="field">
+              <label id="scoreLabel" for="academicScore">GPA</label>
+              <input id="academicScore" class="input" type="text" readonly />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Interests tier list</h2>
+
+          <div class="tier-columns">
+            <div>
+              <h3>Favoured interests</h3>
+
+              <div class="tier-list" data-kind="wanted">
+                <div class="tier-row" data-tier="high">
+                  <div class="tier-label">High</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+
+                <div class="tier-row" data-tier="medium">
+                  <div class="tier-label">Med</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+
+                <div class="tier-row" data-tier="low">
+                  <div class="tier-label">Low</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3>Unfavoured interests</h3>
+
+              <div class="tier-list" data-kind="unwanted">
+                <div class="tier-row" data-tier="high">
+                  <div class="tier-label">High</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+
+                <div class="tier-row" data-tier="medium">
+                  <div class="tier-label">Med</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+
+                <div class="tier-row" data-tier="low">
+                  <div class="tier-label">Low</div>
+                  <div class="tier-dropzone"></div>
+                  <button class="plus-btn-tier">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="interestModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 style="margin: 0;">Add interest</h2>
+          <p id="modalContext" class="muted" style="margin: 5px 0 0;"></p>
+        </div>
+
+        <button id="closeModal" class="icon-btn">Close</button>
+      </div>
+
+      <input id="interestSearch" class="input" type="search" placeholder="Search interests..." />
+      <div id="interestResults" class="interest-results"></div>
+    </div>
+  </div>
+
+  <script src="/js/shared.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>

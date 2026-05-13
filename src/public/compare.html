@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compare | FindMyUniSG</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <nav class="navbar">
+      <a class="brand" href="/course-finder.html">FindMyUniSG</a>
+      <div class="nav-links">
+        <a class="nav-link" href="/course-finder.html">Course Finder</a>
+        <a class="nav-link active" href="/compare.html">Compare</a>
+        <a class="nav-link" href="/profile.html">Profile</a>
+        
+      </div>
+    </nav>
+
+    <section class="page active">
+      <h1 class="hero-title">Compare courses side by side.</h1>
+
+      <div class="compare-grid">
+        <section class="compare-slot">
+          <button class="plus-btn-compare visible add-course-btn" data-side="left">+</button>
+          <div id="leftCourse"></div>
+        </section>
+
+        <section class="compare-slot">
+          <button class="plus-btn-compare visible add-course-btn" data-side="right">+</button>
+          <div id="rightCourse"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="courseSearchModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 style="margin: 0;">Add course</h2>
+          <p class="muted" style="margin: 5px 0 0;">Search and select a course to compare.</p>
+        </div>
+
+        <button id="closeCourseModal" class="icon-btn">Close</button>
+      </div>
+
+      <input id="courseSearchInput" class="input" type="search" placeholder="Search courses..." />
+      <div id="courseSearchResults" class="interest-results"></div>
+    </div>
+  </div>
+
+  <script src="/js/shared.js"></script>
+  <script src="/js/compare.js"></script>
+</body>
+</html>

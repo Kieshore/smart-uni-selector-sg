@@ -232,11 +232,12 @@ function getAllUnwantedInterests(interestProfile) {
 function validateInterestProfile(interestProfile, priorityOrder, options = {}) {
   const selectedInterests = getAllSelectedInterests(interestProfile);
   const wantedInterests = getAllWantedInterests(interestProfile);
+  const unWantedInterests = getAllUnwantedInterests(interestProfile);
   const includesInterestPriority = priorityOrder.includes("interest");
   const excludeUnwantedInterests = Boolean(options.excludeUnwantedInterests);
   const onlyWantedInterests = Boolean(options.onlyWantedInterests);
 
-  if (includesInterestPriority && selectedInterests.length === 0) {
+  if (includesInterestPriority && (selectedInterests.length===0&&unWantedInterests.length=== 0)) {
     throw new Error(
       "interest_priority was provided but no interests were supplied. Pass high_interests, medium_interests, low_interests, or the unwanted interest fields."
     );
